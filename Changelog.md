@@ -31,7 +31,6 @@ Bugfixes:
  * Type Checker: Disallow invoking the same modifier multiple times.
  * Type Checker: Do not treat strings that look like addresses as addresses.
  * Type Checker: Fix address literals not being treated as compile-time constants.
- * Type Checker: Make UTF8-validation a bit more sloppy to include more valid sequences.
  * Type Checker: Support valid, but incorrectly rejected UTF-8 sequences.
  * Unused variable warnings no longer issued for variables used inside inline assembly.
 
