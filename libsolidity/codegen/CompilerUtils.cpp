@@ -1013,11 +1013,13 @@ void CompilerUtils::cleanHigherOrderBits(IntegerType const& _typeOnStack)
 
 void CompilerUtils::leftShiftNumberOnStack(int _shiftFactor)
 {
+	solAssert(_shiftFactor >= 0 && _shiftFactor < 256, "");
 	m_context << (u256(1) << _shiftFactor) << Instruction::MUL;
 }
 
 void CompilerUtils::rightShiftNumberOnStack(int _shiftFactor, bool _isSigned)
 {
+	solAssert(_shiftFactor >= 0 && _shiftFactor < 256, "");
 	m_context << (u256(1) << _shiftFactor) << Instruction::SWAP1 << (_isSigned ? Instruction::SDIV : Instruction::DIV);
 }
 
