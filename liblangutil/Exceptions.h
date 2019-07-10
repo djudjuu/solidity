@@ -40,6 +40,8 @@ struct CompilerError: virtual dev::Exception {};
 struct InternalCompilerError: virtual dev::Exception {};
 struct FatalError: virtual dev::Exception {};
 struct UnimplementedFeatureError: virtual dev::Exception {};
+struct InvalidAstError: virtual dev::Exception {};
+
 
 /// Assertion that throws an InternalCompilerError containing the given description if it is not met.
 #define solAssert(CONDITION, DESCRIPTION) \
@@ -50,6 +52,9 @@ struct UnimplementedFeatureError: virtual dev::Exception {};
 
 #define solUnimplemented(DESCRIPTION) \
 	solUnimplementedAssert(false, DESCRIPTION)
+
+#define astAssert(CONDITION, DESCRIPTION) \
+	assertThrow(CONDITION, ::langutil::InvalidAstError, DESCRIPTION)
 
 class Error: virtual public dev::Exception
 {

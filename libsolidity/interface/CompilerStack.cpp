@@ -38,6 +38,7 @@
 
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/TypeProvider.h>
+#include <libsolidity/ast/ASTJsonImporter.h>
 #include <libsolidity/codegen/Compiler.h>
 #include <libsolidity/formal/ModelChecker.h>
 #include <libsolidity/interface/ABI.h>
@@ -247,6 +248,27 @@ bool CompilerStack::parse()
 	}
 	else
 		return false;
+}
+
+bool CompilerStack::importASTs(map<string, Json::Value const*> const& _sources)
+{
+	if (m_stackState != Empty)
+		return false;
+	m_sourceJsons = _sources;
+	map<string, ASTPointer<SourceUnit>> reconstructedSources = ASTJsonImporter(m_sourceJsons).jsonToSourceUnit();
+	for (auto& src : reconstructedSources)
+	{
+		string const& path = src.first;
+		Source source;
+		source.ast = src.second;
+		string srcString = dev::jsonCompactPrint(*m_sourceJsons[src.first]);
+		ASTPointer<Scanner> scanner = 0; // make_shared<Scanner>(CharStream(srcString), src.first);
+		source.scanner = scanner;
+		m_sources[path] = source;
+	}
+	m_stackState = ParsingSuccessful;
+	m_importedSources = true;
+	return true;
 }
 
 bool CompilerStack::analyze()

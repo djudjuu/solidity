@@ -176,6 +176,10 @@ public:
 	/// @returns false on error.
 	bool parse();
 
+	/// Imports given SourceUnits so they can be analyzed. Leads to the same internal state as parse().
+	/// @returns false if the CompilerStack was not reset beforehand.
+	bool importASTs(std::map<std::string, Json::Value const*> const& _sources);
+
 	/// Performs the analysis steps (imports, scopesetting, syntaxCheck, referenceResolving,
 	///  typechecking, staticAnalysis) on previously parsed sources.
 	/// @returns false on error.
@@ -282,6 +286,10 @@ public:
 
 	/// Overwrites the release/prerelease flag. Should only be used for testing.
 	void overwriteReleaseFlag(bool release) { m_release = release; }
+
+	/// @returns true if the source files were imported from a json-file
+	bool importedSources() { return m_importedSources; }
+
 private:
 	/// The state per source unit. Filled gradually during parsing.
 	struct Source
@@ -402,6 +410,8 @@ private:
 	/// "context:prefix=target"
 	std::vector<Remapping> m_remappings;
 	std::map<std::string const, Source> m_sources;
+	// if imported store AST-Jsons for each filename
+	std::map<std::string, Json::Value const*> m_sourceJsons;
 	std::vector<std::string> m_unhandledSMTLib2Queries;
 	std::map<h256, std::string> m_smtlib2Responses;
 	std::shared_ptr<GlobalContext> m_globalContext;
@@ -415,6 +425,8 @@ private:
 	bool m_parserErrorRecovery = false;
 	State m_stackState = Empty;
 	bool m_release = VersionIsRelease;
+	bool m_importedSources = false;
+
 };
 
 }

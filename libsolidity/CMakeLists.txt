@@ -39,6 +39,8 @@ set(sources
 	ast/ASTForward.h
 	ast/ASTJsonConverter.cpp
 	ast/ASTJsonConverter.h
+	ast/ASTJsonImporter.cpp
+	ast/ASTJsonImporter.h
 	ast/ASTPrinter.cpp
 	ast/ASTPrinter.h
 	ast/ASTVisitor.h
