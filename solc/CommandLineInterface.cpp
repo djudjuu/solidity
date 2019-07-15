@@ -29,6 +29,7 @@
 #include <libsolidity/parsing/Parser.h>
 #include <libsolidity/ast/ASTPrinter.h>
 #include <libsolidity/ast/ASTJsonConverter.h>
+#include <libsolidity/ast/ASTJsonImporter.h>
 #include <libsolidity/analysis/NameAndTypeResolver.h>
 #include <libsolidity/interface/CompilerStack.h>
 #include <libsolidity/interface/StandardCompiler.h>
@@ -119,6 +120,7 @@ static string const g_strEVMVersion = "evm-version";
 static string const g_streWasm = "ewasm";
 static string const g_strGas = "gas";
 static string const g_strHelp = "help";
+static string const g_strImportAst = "import-ast";
 static string const g_strInputFile = "input-file";
 static string const g_strInterface = "interface";
 static string const g_strYul = "yul";
@@ -168,6 +170,7 @@ static string const g_argCompactJSON = g_strCompactJSON;
 static string const g_argErrorRecovery = g_strErrorRecovery;
 static string const g_argGas = g_strGas;
 static string const g_argHelp = g_strHelp;
+static string const g_argImportAst = g_strImportAst;
 static string const g_argInputFile = g_strInputFile;
 static string const g_argYul = g_strYul;
 static string const g_argIR = g_strIR;
@@ -521,6 +524,44 @@ bool CommandLineInterface::readInputFilesAndConfigureRemappings()
 	return true;
 }
 
+//read file contents, which either are
+// a) a json-file with multiple sources (as produced by --combined-json -ast,compact-format)
+map<string, Json::Value const*> CommandLineInterface::parseAstFromInput()
+{
+	map<string, Json::Value const*> sourceJsons;
+	map<string, string> tmp_sources; //used to generate the onchainmetadata-hash
+//	Json::CharReaderBuilder reader;
+	for (auto const& srcPair: m_sourceCodes) // aka <string, string>
+	{
+		Json::Value* ast = new Json::Value(); //use shared-Pointer here?
+		// try parsing as json
+		if (jsonParse(srcPair.second, *ast))
+		{
+			//case a)
+			if ((*ast).isMember("sourceList") && (*ast).isMember("sources"))
+			{
+				for (auto& src: (*ast)["sourceList"])
+				{
+					astAssert( (*ast)["sources"][src.asString()]["AST"]["nodeType"].asString() == "SourceUnit",  "Top-level node should be a 'SourceUnit'");
+					sourceJsons[src.asString()] = &((*ast)["sources"][src.asString()]["AST"]);
+					tmp_sources[src.asString()] = dev::jsonCompactPrint(*ast);
+				}
+			}
+			else
+			{
+				BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("should have been option A")); //TODO make this helpful
+			}
+		}
+		else
+		{
+			BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("Input file could not be parsed to JSON"));
+		}
+	}
+	//replace the internal map so that every source has its own entry
+	m_sourceCodes = tmp_sources;
+	return sourceJsons;
+}
+
 bool CommandLineInterface::parseLibraryOption(string const& _input)
 {
 	namespace fs = boost::filesystem;
@@ -671,6 +712,13 @@ Allowed options)",
 			"Output a single json document containing the specified information."
 		)
 		(g_argGas.c_str(), "Print an estimate of the maximal gas usage for each function.")
+		(
+			g_argImportAst.c_str(),
+			"Import ASTs to be compiled, assumes input holds the AST in compact JSON format."
+			" Supported Inputs are individual ASTs (e.g. produced by --ast-compact-json), "
+//			" metadatafiles with Solidity-AST as language (--metadata --metadata-literal) and"
+//			" JSONs with multiple sourcefiles (--combined-json ast,compact-format)"
+		)
 		(
 			g_argStandardJSON.c_str(),
 			"Switch to Standard JSON input / output mode, ignoring all options. "
@@ -940,12 +988,26 @@ bool CommandLineInterface::processInput()
 			m_compiler->useMetadataLiteralSources(true);
 		if (m_args.count(g_argInputFile))
 			m_compiler->setRemappings(m_remappings);
-		m_compiler->setSources(m_sourceCodes);
-		if (m_args.count(g_argLibraries))
-			m_compiler->setLibraries(m_libraries);
-		if (m_args.count(g_argErrorRecovery))
-			m_compiler->setParserErrorRecovery(true);
-		m_compiler->setEVMVersion(m_evmVersion);
+		if (m_args.count(g_argImportAst))
+		{
+			map<string, Json::Value const*> sourceJsons = parseAstFromInput();
+			//feed AST to compiler
+			m_compiler->reset(false);
+			//use the compiler's analyzer to annotate, typecheck, etc...
+			if (!m_compiler->importASTs(sourceJsons))
+				astAssert(false, "Import of the AST failed");
+			if (!m_compiler->analyze())
+				astAssert(false, "Analysis of the AST failed");
+		}
+		else
+		{
+			m_compiler->setSources(m_sourceCodes);
+			if (m_args.count(g_argLibraries))
+				m_compiler->setLibraries(m_libraries);
+			if (m_args.count(g_argErrorRecovery))
+				m_compiler->setParserErrorRecovery(true);
+			m_compiler->setEVMVersion(m_evmVersion);
+		}
 		// TODO: Perhaps we should not compile unless requested
 
 		m_compiler->enableIRGeneration(m_args.count(g_argIR));

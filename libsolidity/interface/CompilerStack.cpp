@@ -127,14 +127,14 @@ void CompilerStack::setRemappings(vector<Remapping> const& _remappings)
 
 void CompilerStack::setEVMVersion(langutil::EVMVersion _version)
 {
-	if (m_stackState >= ParsingSuccessful)
+	if (m_stackState >= ParsingSuccessful && !m_importedSources)
 		BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Must set EVM version before parsing."));
 	m_evmVersion = _version;
 }
 
 void CompilerStack::setLibraries(std::map<std::string, h160> const& _libraries)
 {
-	if (m_stackState >= ParsingSuccessful)
+	if (m_stackState >= ParsingSuccessful && !m_importedSources)
 		BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Must set libraries before parsing."));
 	m_libraries = _libraries;
 }
@@ -148,7 +148,7 @@ void CompilerStack::setOptimiserSettings(bool _optimize, unsigned _runs)
 
 void CompilerStack::setOptimiserSettings(OptimiserSettings _settings)
 {
-	if (m_stackState >= ParsingSuccessful)
+	if (m_stackState >= ParsingSuccessful && !m_importedSources)
 		BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Must set optimiser settings before parsing."));
 	m_optimiserSettings = std::move(_settings);
 }

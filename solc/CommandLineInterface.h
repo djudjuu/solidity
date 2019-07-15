@@ -77,6 +77,11 @@ private:
 
 	/// Fills @a m_sourceCodes initially and @a m_redirects.
 	bool readInputFilesAndConfigureRemappings();
+
+	/// Tries to interpret @ m_sourceCodes as AST in compact-json format
+	/// (produced by --combined-json ast,compact-format <file.sol>
+	/// such that they can be imported into the compiler  (importASTs())
+	std::map<std::string, Json::Value const*> parseAstFromInput();
 	/// Tries to read from the file @a _input or interprets _input literally if that fails.
 	/// It then tries to parse the contents and appends to m_libraries.
 	bool parseLibraryOption(std::string const& _input);
