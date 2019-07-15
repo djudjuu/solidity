@@ -21,10 +21,10 @@
  */
 
 #include <libsolidity/ast/ASTJsonImporter.h>
-//#include <libsolidity/parsing/Scanner.h>
+#include <liblangutil/Scanner.h>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string.hpp>
-#include <libsolidity/parsing/Token.h>
+#include <liblangutil/Token.h>
 //#include <libsolidity/inlineasm/AsmParser.h>
 #include <liblangutil/SourceLocation.h>
 #include <liblangutil/Exceptions.h>
@@ -77,6 +77,12 @@ Json::Value ASTJsonImporter::member(Json::Value const& _node, string const& _nam
 	return _node[_name];
 }
 
+Token ASTJsonImporter::scanSingleToken(Json::Value _node)
+{
+	langutil::Scanner scanner{langutil::CharStream(_node.asString(), "")};
+	astAssert(scanner.peekNextToken() == Token::EOS, "Token string is too long.");
+	return scanner.currentToken();
+}
 
 template <typename T, typename... Args>
 ASTPointer<T> ASTJsonImporter::createASTNode(Json::Value const& _node, Args&&... _args)
@@ -112,12 +118,25 @@ SourceLocation const ASTJsonImporter::createSourceLocation(Json::Value const& _n
 	return SourceLocation{ start, end, 0}; //m_sourceLocations[stoi(pos[2])]}; // TODO create CharStream object?
 }
 
+ASTPointer<PragmaDirective> ASTJsonImporter::createPragmaDirective(Json::Value const& _node)
+{
+	vector<Token> tokens;
+	vector<ASTString> literals;
+	for (auto const& lit: member(_node, "literals"))
+	{
+		string l = lit.asString();
+		literals.push_back(l);
+		tokens.push_back(scanSingleToken(l));
+	}
+	return createASTNode<PragmaDirective>(_node, tokens, literals);
+}
+
 ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _json)
 {
 	astAssert(_json.isMember("nodeType") && _json.isMember("id"), "JSON-Node needs to have 'nodeType' and 'id' fields.");
 	string nodeType = _json["nodeType"].asString();
 	if (nodeType == "PragmaDirective")
-	    return nullptr; //createPragmaDirective(_json);
+	    return createPragmaDirective(_json);
 //	if (nodeType == "ImportDirective")
 //	    return createImportDirective(_json);
 //	if (nodeType == "ContractDefinition")
@@ -224,6 +243,3 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 //		contractKind(_node)
 //	);
 //}
-
-
-

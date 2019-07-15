@@ -63,14 +63,15 @@ private:
 
 	// ============ functions to instantiate the AST-Nodes from Json-Nodes ==============
 	ASTPointer<SourceUnit> createSourceUnit(Json::Value const& _node, std::string const& _srcName);
-//	ASTPointer<PragmaDirective> createPragmaDirective(Json::Value const& _node);
+	ASTPointer<PragmaDirective> createPragmaDirective(Json::Value const& _node);
 //	ASTPointer<ImportDirective> createImportDirective(Json::Value const& _node);
 //	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
 
 	// =============== helpers ===================
 	// returns the member of a given JSON object, throws if member does not exist
 	Json::Value member(Json::Value const& _node, std::string const& _name);
-
+	// used to parse pragmaDirective
+	Token scanSingleToken(Json::Value _node);
 
 	// =========== member variables ===============
 	std::map<std::string, Json::Value const*> m_sourceList;
