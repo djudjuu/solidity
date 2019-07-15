@@ -87,8 +87,17 @@ ASTPointer<T> ASTJsonImporter::createASTNode(Json::Value const& _node, Args&&...
 	return n;
 }
 
-// ===== specific AST functions ==========
 
+// ===== specific AST functions ==========
+ASTPointer<SourceUnit> ASTJsonImporter::createSourceUnit(Json::Value const& _node, string const& _srcName)
+{
+	vector<ASTPointer<ASTNode>> nodes;
+	for (auto& child: member(_node, "nodes"))
+		nodes.emplace_back(convertJsonToASTNode(child));
+	ASTPointer<SourceUnit> tmp = createASTNode<SourceUnit>(_node, nodes);
+	tmp->annotation().path = _srcName;
+	return tmp;
+}
 
 SourceLocation const ASTJsonImporter::createSourceLocation(Json::Value const& _node)
 {
@@ -107,12 +116,12 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 {
 	astAssert(_json.isMember("nodeType") && _json.isMember("id"), "JSON-Node needs to have 'nodeType' and 'id' fields.");
 	string nodeType = _json["nodeType"].asString();
-//	if (nodeType == "PragmaDirective")
-//	    return createPragmaDirective(_json);
+	if (nodeType == "PragmaDirective")
+	    return nullptr; //createPragmaDirective(_json);
 //	if (nodeType == "ImportDirective")
 //	    return createImportDirective(_json);
-	if (nodeType == "ContractDefinition")
-		return createContractDefinition(_json);
+//	if (nodeType == "ContractDefinition")
+//		return createContractDefinition(_json);
 //	if (nodeType == "InheritanceSpecifier")
 //	    return createInheritanceSpecifier(_json);
 //	if (nodeType == "UsingForDirective")
@@ -199,22 +208,22 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 		BOOST_THROW_EXCEPTION(langutil::InvalidAstError() << errinfo_comment("Unknown type of ASTNode."));
 }
 
-ASTPointer<ContractDefinition> ASTJsonImporter::createContractDefinition(Json::Value const& _node){
-	std::vector<ASTPointer<InheritanceSpecifier>> baseContracts;
-	for (auto& base : _node["baseContracts"])
-		baseContracts.push_back(createInheritanceSpecifier(base));
-	std::vector<ASTPointer<ASTNode>> subNodes;
-	for (auto& subnode : _node["nodes"])
-		subNodes.push_back(convertJsonToASTNode(subnode));
-	return createASTNode<ContractDefinition>(
-		_node,
-		make_shared<ASTString>(_node["name"].asString()),
-		nullOrASTString(_node, "documentation"),
-		baseContracts,
-		subNodes,
-		contractKind(_node)
-	);
-}
+//ASTPointer<ContractDefinition> ASTJsonImporter::createContractDefinition(Json::Value const& _node){
+//	std::vector<ASTPointer<InheritanceSpecifier>> baseContracts;
+//	for (auto& base : _node["baseContracts"])
+//		baseContracts.push_back(createInheritanceSpecifier(base));
+//	std::vector<ASTPointer<ASTNode>> subNodes;
+//	for (auto& subnode : _node["nodes"])
+//		subNodes.push_back(convertJsonToASTNode(subnode));
+//	return createASTNode<ContractDefinition>(
+//		_node,
+//		make_shared<ASTString>(_node["name"].asString()),
+//		nullOrASTString(_node, "documentation"),
+//		baseContracts,
+//		subNodes,
+//		contractKind(_node)
+//	);
+//}
 
 
 

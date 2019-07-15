@@ -52,19 +52,23 @@ public:
 private:
 
 	// =========== general creation functions ==============
+	// creates the ASTNode Object class by adding the source location and node-ID and forwarding
 	template <typename T, typename... Args>
 	ASTPointer<T> createASTNode(Json::Value const& _node, Args&&... _args);
+	// creates the sourceLocation-object from the string in the JSON node
 	langutil::SourceLocation const createSourceLocation(Json::Value const& _node);
 	// function to be called when the type of the Json-node is unknown
+	// will then call the createNodeTypefunction which will call createASTNode<correctType>
 	ASTPointer<ASTNode> convertJsonToASTNode(Json::Value const& _ast);
 
 	// ============ functions to instantiate the AST-Nodes from Json-Nodes ==============
 	ASTPointer<SourceUnit> createSourceUnit(Json::Value const& _node, std::string const& _srcName);
 //	ASTPointer<PragmaDirective> createPragmaDirective(Json::Value const& _node);
 //	ASTPointer<ImportDirective> createImportDirective(Json::Value const& _node);
-	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
+//	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
 
 	// =============== helpers ===================
+	// returns the member of a given JSON object, throws if member does not exist
 	Json::Value member(Json::Value const& _node, std::string const& _name);
 
 
