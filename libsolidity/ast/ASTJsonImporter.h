@@ -74,8 +74,12 @@ private:
 	Token scanSingleToken(Json::Value _node);
 
 	// =========== member variables ===============
+	// TODO: do i really need all these m_source...?
+	// path to file -> file with AST in JSON format
 	std::map<std::string, Json::Value const*> m_sourceList;
+	// list of path to files (used as names)
 	std::vector<std::shared_ptr<std::string const>> m_sourceLocations;
+	// path to file -> AST
 	std::map<std::string, ASTPointer<SourceUnit>> m_sourceUnits;
 	std::string m_currentSourceName;
 };

@@ -115,7 +115,9 @@ SourceLocation const ASTJsonImporter::createSourceLocation(Json::Value const& _n
 		BOOST_THROW_EXCEPTION(langutil::InvalidAstError() << errinfo_comment("'src'-field ill-formatted or src-index too high"));
 	int start = stoi(pos[0]);
 	int end = start + stoi(pos[1]);
-	return SourceLocation{ start, end, 0}; //m_sourceLocations[stoi(pos[2])]}; // TODO create CharStream object?
+	// ASSUMPTION: only the name of source is used from here on, the m_source of the CharStream-Object can be empty
+	std::shared_ptr<langutil::CharStream> source = make_shared<langutil::CharStream>("", m_currentSourceName);
+	return SourceLocation{ start, end,source};
 }
 
 ASTPointer<PragmaDirective> ASTJsonImporter::createPragmaDirective(Json::Value const& _node)

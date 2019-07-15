@@ -1001,13 +1001,16 @@ bool CommandLineInterface::processInput()
 		}
 		else
 		{
+			// this only makes sense if source code is not an AST
 			m_compiler->setSources(m_sourceCodes);
-			if (m_args.count(g_argLibraries))
-				m_compiler->setLibraries(m_libraries);
 			if (m_args.count(g_argErrorRecovery))
 				m_compiler->setParserErrorRecovery(true);
-			m_compiler->setEVMVersion(m_evmVersion);
 		}
+
+		if (m_args.count(g_argLibraries))
+			m_compiler->setLibraries(m_libraries);
+		m_compiler->setEVMVersion(m_evmVersion);
+
 		// TODO: Perhaps we should not compile unless requested
 
 		m_compiler->enableIRGeneration(m_args.count(g_argIR));
