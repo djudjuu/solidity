@@ -20,6 +20,7 @@
 #include <test/TestCase.h>
 #include <test/libsolidity/ABIJsonTest.h>
 #include <test/libsolidity/ASTJSONTest.h>
+#include <test/libsolidity/ASTImportTest.h>
 #include <test/libsolidity/GasTest.h>
 #include <test/libsolidity/SyntaxTest.h>
 #include <test/libsolidity/SemanticTest.h>
@@ -60,6 +61,7 @@ Testsuite const g_interactiveTestsuites[] = {
 	{"Error Recovery",      "libsolidity", "errorRecoveryTests",  false, false, &SyntaxTest::createErrorRecovery},
 	{"Semantic",            "libsolidity", "semanticTests",       false, true,  &SemanticTest::create},
 	{"JSON AST",            "libsolidity", "ASTJSON",             false, false, &ASTJSONTest::create},
+	{"AST Import",          "libsolidity", "ASTImport",           false, false, &ASTImportTest::create},
 	{"JSON ABI",            "libsolidity", "ABIJson",             false, false, &ABIJsonTest::create},
 	{"SMT Checker",         "libsolidity", "smtCheckerTests",     true,  false, &SyntaxTest::create},
 	{"SMT Checker JSON",    "libsolidity", "smtCheckerTestsJSON", true,  false, &SMTCheckerTest::create},

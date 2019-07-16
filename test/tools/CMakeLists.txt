@@ -29,6 +29,7 @@ add_executable(isoltest
 	../RPCSession.cpp
 	../libsolidity/ABIJsonTest.cpp
 	../libsolidity/ASTJSONTest.cpp
+	../libsolidity/ASTImportTest.cpp
 	../libsolidity/SMTCheckerJSONTest.cpp
 	../libyul/ObjectCompilerTest.cpp
 	../libyul/YulOptimizerTest.cpp
