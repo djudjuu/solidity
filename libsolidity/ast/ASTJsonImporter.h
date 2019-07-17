@@ -65,13 +65,34 @@ private:
 	ASTPointer<SourceUnit> createSourceUnit(Json::Value const& _node, std::string const& _srcName);
 	ASTPointer<PragmaDirective> createPragmaDirective(Json::Value const& _node);
 //	ASTPointer<ImportDirective> createImportDirective(Json::Value const& _node);
-//	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
+	ASTPointer<ImportDirective> createImportDirective(Json::Value const& _node);
+	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
+	ASTPointer<InheritanceSpecifier> createInheritanceSpecifier(Json::Value const& _node);
+
+	ASTPointer<UserDefinedTypeName> createUserDefinedTypeName(Json::Value const& _node);
+
 
 	// =============== helpers ===================
 	// returns the member of a given JSON object, throws if member does not exist
 	Json::Value member(Json::Value const& _node, std::string const& _name);
 	// used to parse pragmaDirective
 	Token scanSingleToken(Json::Value _node);
+	template<class T>
+	ASTPointer<T> nullOrCast(Json::Value _json);
+	ASTPointer<ASTString> nullOrASTString(Json::Value _json, std::string const& _name);
+
+	//	Token::Value literalTokenKind(Json::Value const& _node);
+
+	// ============== JSON to definition helpers ===============
+	ASTPointer<ASTString> memberAsASTString(Json::Value const& _node, std::string const& _name);
+	bool memberAsBool(Json::Value const& _node, std::string const& _name);
+
+	//	Declaration::Visibility visibility(Json::Value const& _node);
+//	StateMutability stateMutability(Json::Value const& _node);
+//	VariableDeclaration::Location location(Json::Value const& _node);
+	ContractDefinition::ContractKind contractKind(Json::Value const& _node);
+//	Literal::SubDenomination subdenomination(Json::Value const& _node);
+
 
 	// =========== member variables ===============
 	// TODO: do i really need all these m_source...?

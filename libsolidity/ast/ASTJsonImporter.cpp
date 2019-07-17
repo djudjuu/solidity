@@ -38,6 +38,13 @@ using namespace solidity;
 
 using SourceLocation = langutil::SourceLocation;
 
+template<class T>
+ASTPointer<T> castPointer(ASTPointer<ASTNode> _ast)
+{
+	ASTPointer<T> ret = dynamic_pointer_cast<T>(_ast);
+	astAssert(ret, "");
+	return ret;
+}
 
 // ============ public ===========================
 
@@ -52,8 +59,8 @@ map<string, ASTPointer<SourceUnit>> ASTJsonImporter::jsonToSourceUnit()
 {
 	for (auto const& srcPair: m_sourceList)
 	{
-//		astAssert(!srcPair.second->isNull(), "");
-//		astAssert(member(*srcPair.second,"nodeType") == "SourceUnit", "The 'nodeType' of the highest node must be 'SourceUnit'.");
+		astAssert(!srcPair.second->isNull(), "");
+		astAssert(member(*srcPair.second,"nodeType") == "SourceUnit", "The 'nodeType' of the highest node must be 'SourceUnit'.");
 		m_currentSourceName = srcPair.first;
 		m_sourceUnits[srcPair.first] =  createSourceUnit(*srcPair.second, srcPair.first);
 	}
@@ -62,28 +69,7 @@ map<string, ASTPointer<SourceUnit>> ASTJsonImporter::jsonToSourceUnit()
 
 // ============ private ===========================
 
-// ===== helper functions ==========
-template<class T>
-ASTPointer<T> castPointer(ASTPointer<ASTNode> _ast)
-{
-	ASTPointer<T> ret = dynamic_pointer_cast<T>(_ast);
-	astAssert(ret, "");
-	return ret;
-}
-
-Json::Value ASTJsonImporter::member(Json::Value const& _node, string const& _name)
-{
-	astAssert(_node.isMember(_name), "Node '" + _node["nodeType"].asString() + "' (id " + _node["id"].asString() + ") is missing field '" + _name + "'.");
-	return _node[_name];
-}
-
-Token ASTJsonImporter::scanSingleToken(Json::Value _node)
-{
-	langutil::Scanner scanner{langutil::CharStream(_node.asString(), "")};
-	astAssert(scanner.peekNextToken() == Token::EOS, "Token string is too long.");
-	return scanner.currentToken();
-}
-
+// =========== general creation functions ==============
 template <typename T, typename... Args>
 ASTPointer<T> ASTJsonImporter::createASTNode(Json::Value const& _node, Args&&... _args)
 {
@@ -91,18 +77,6 @@ ASTPointer<T> ASTJsonImporter::createASTNode(Json::Value const& _node, Args&&...
 	auto n = make_shared<T>(createSourceLocation(_node), forward<Args>(_args)...);
 	n->setID(_node["id"].asInt());
 	return n;
-}
-
-
-// ===== specific AST functions ==========
-ASTPointer<SourceUnit> ASTJsonImporter::createSourceUnit(Json::Value const& _node, string const& _srcName)
-{
-	vector<ASTPointer<ASTNode>> nodes;
-	for (auto& child: member(_node, "nodes"))
-		nodes.emplace_back(convertJsonToASTNode(child));
-	ASTPointer<SourceUnit> tmp = createASTNode<SourceUnit>(_node, nodes);
-	tmp->annotation().path = _srcName;
-	return tmp;
 }
 
 SourceLocation const ASTJsonImporter::createSourceLocation(Json::Value const& _node)
@@ -120,31 +94,18 @@ SourceLocation const ASTJsonImporter::createSourceLocation(Json::Value const& _n
 	return SourceLocation{ start, end,source};
 }
 
-ASTPointer<PragmaDirective> ASTJsonImporter::createPragmaDirective(Json::Value const& _node)
-{
-	vector<Token> tokens;
-	vector<ASTString> literals;
-	for (auto const& lit: member(_node, "literals"))
-	{
-		string l = lit.asString();
-		literals.push_back(l);
-		tokens.push_back(scanSingleToken(l));
-	}
-	return createASTNode<PragmaDirective>(_node, tokens, literals);
-}
-
 ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _json)
 {
 	astAssert(_json.isMember("nodeType") && _json.isMember("id"), "JSON-Node needs to have 'nodeType' and 'id' fields.");
 	string nodeType = _json["nodeType"].asString();
 	if (nodeType == "PragmaDirective")
-	    return createPragmaDirective(_json);
+		return createPragmaDirective(_json);
 //	if (nodeType == "ImportDirective")
-//	    return createImportDirective(_json);
-//	if (nodeType == "ContractDefinition")
-//		return createContractDefinition(_json);
-//	if (nodeType == "InheritanceSpecifier")
-//	    return createInheritanceSpecifier(_json);
+//		return createImportDirective(_json);
+	if (nodeType == "ContractDefinition")
+		return createContractDefinition(_json);
+	if (nodeType == "InheritanceSpecifier")
+		return createInheritanceSpecifier(_json);
 //	if (nodeType == "UsingForDirective")
 //		return createUsingForDirective(_json);
 //	if (nodeType == "StructDefinition")
@@ -167,8 +128,8 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 //		return createEventDefinition(_json);
 //	if (nodeType == "ElementaryTypeName")
 //		return createElementaryTypeName(_json);
-//	if (nodeType == "UserDefinedTypeName")
-//		return createUserDefinedTypeName(_json);
+	if (nodeType == "UserDefinedTypeName")
+		return createUserDefinedTypeName(_json);
 //	if (nodeType == "FunctionTypeName")
 //		return createFunctionTypeName(_json);
 //	if (nodeType == "Mapping")
@@ -229,19 +190,144 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 		BOOST_THROW_EXCEPTION(langutil::InvalidAstError() << errinfo_comment("Unknown type of ASTNode."));
 }
 
-//ASTPointer<ContractDefinition> ASTJsonImporter::createContractDefinition(Json::Value const& _node){
-//	std::vector<ASTPointer<InheritanceSpecifier>> baseContracts;
-//	for (auto& base : _node["baseContracts"])
-//		baseContracts.push_back(createInheritanceSpecifier(base));
-//	std::vector<ASTPointer<ASTNode>> subNodes;
-//	for (auto& subnode : _node["nodes"])
-//		subNodes.push_back(convertJsonToASTNode(subnode));
-//	return createASTNode<ContractDefinition>(
+// ============ functions to instantiate the AST-Nodes from Json-Nodes ==============
+
+ASTPointer<SourceUnit> ASTJsonImporter::createSourceUnit(Json::Value const& _node, string const& _srcName)
+{
+	vector<ASTPointer<ASTNode>> nodes;
+	for (auto& child: member(_node, "nodes"))
+		nodes.emplace_back(convertJsonToASTNode(child));
+	ASTPointer<SourceUnit> tmp = createASTNode<SourceUnit>(_node, nodes);
+	tmp->annotation().path = _srcName;
+	return tmp;
+}
+
+ASTPointer<PragmaDirective> ASTJsonImporter::createPragmaDirective(Json::Value const& _node)
+{
+	vector<Token> tokens;
+	vector<ASTString> literals;
+	for (auto const& lit: member(_node, "literals"))
+	{
+		string l = lit.asString();
+		literals.push_back(l);
+		tokens.push_back(scanSingleToken(l));
+	}
+	return createASTNode<PragmaDirective>(_node, tokens, literals);
+}
+
+
+//ASTPointer<ImportDirective> ASTJsonImporter::createImportDirective(Json::Value const& _node){
+//	ASTPointer<ASTString> unitAlias = memberAsASTString(_node, "unitAlias");
+//	ASTPointer<ASTString> path = memberAsASTString(_node, "file");
+//	vector<pair<ASTPointer<Identifier>, ASTPointer<ASTString>>> symbolAliases;
+//	for (auto& tuple: _node["symbolAliases"])
+//	{
+//                symbolAliases.push_back( make_pair(
+//			createIdentifier(tuple["foreign"]),
+//			tuple["local"].isNull() ? nullptr : make_shared<ASTString>(tuple["local"].asString())
+//		));
+//	}
+//	ASTPointer<ImportDirective> tmp = createASTNode<ImportDirective>(
 //		_node,
-//		make_shared<ASTString>(_node["name"].asString()),
-//		nullOrASTString(_node, "documentation"),
-//		baseContracts,
-//		subNodes,
-//		contractKind(_node)
+//		path,
+//		unitAlias,
+//		move(symbolAliases)
 //	);
+//	tmp->annotation().absolutePath = _node["absolutePath"].asString();
+//	return tmp;
+//	return nullptr;
 //}
+
+ASTPointer<ContractDefinition> ASTJsonImporter::createContractDefinition(Json::Value const& _node){
+	std::vector<ASTPointer<InheritanceSpecifier>> baseContracts;
+	for (auto& base : _node["baseContracts"])
+		baseContracts.push_back(createInheritanceSpecifier(base));
+	std::vector<ASTPointer<ASTNode>> subNodes;
+	for (auto& subnode : _node["nodes"])
+		subNodes.push_back(convertJsonToASTNode(subnode));
+	return createASTNode<ContractDefinition>(
+		_node,
+		make_shared<ASTString>(_node["name"].asString()),
+		nullOrASTString(_node, "documentation"),
+		baseContracts,
+		subNodes,
+		contractKind(_node)
+	);
+}
+
+ASTPointer<InheritanceSpecifier> ASTJsonImporter::createInheritanceSpecifier(Json::Value const& _node)
+{
+	std::vector<ASTPointer<Expression>> arguments;
+	for (auto& arg : _node["arguments"])
+		arguments.push_back(castPointer<Expression>(convertJsonToASTNode(arg)));
+	return createASTNode<InheritanceSpecifier>(
+		_node,
+		createUserDefinedTypeName(_node["baseName"]),
+		make_unique<std::vector<ASTPointer<Expression>>>(arguments)
+	);
+}
+
+ASTPointer<UserDefinedTypeName> ASTJsonImporter::createUserDefinedTypeName(Json::Value const& _node)
+{
+	vector<ASTString> namePath;
+	vector<string> strs;
+	string nameString = member(_node, "name").asString();
+	boost::algorithm::split(strs, nameString, boost::is_any_of("."));
+	for (string s : strs)
+		namePath.push_back(ASTString(s));
+	return createASTNode<UserDefinedTypeName>(
+		_node,
+		namePath
+	);
+}
+
+
+// ===== helper functions ==========
+
+Json::Value ASTJsonImporter::member(Json::Value const& _node, string const& _name)
+{
+	astAssert(_node.isMember(_name), "Node '" + _node["nodeType"].asString() + "' (id " + _node["id"].asString() + ") is missing field '" + _name + "'.");
+	return _node[_name];
+}
+
+Token ASTJsonImporter::scanSingleToken(Json::Value _node)
+{
+	langutil::Scanner scanner{langutil::CharStream(_node.asString(), "")};
+	astAssert(scanner.peekNextToken() == Token::EOS, "Token string is too long.");
+	return scanner.currentToken();
+}
+
+ASTPointer<ASTString> ASTJsonImporter::nullOrASTString(Json::Value _json, string const& _name){
+	return _json[_name].isString() ? memberAsASTString(_json, _name) : nullptr;
+}
+
+ASTPointer<ASTString> ASTJsonImporter::memberAsASTString(Json::Value const& _node, string const& _name)
+{
+	Json::Value value = member(_node, _name);
+	astAssert(value.isString(), "field " + _name + " must be of type string.");
+	return make_shared<ASTString>(_node[_name].asString());
+}
+
+bool ASTJsonImporter::memberAsBool(Json::Value const& _node, string const& _name)
+{
+	Json::Value value = member(_node, _name);
+	astAssert(value.isBool(), "field " + _name + " must be of type boolean.");
+	return _node[_name].asBool();
+}
+
+
+// =========== definitions =======================
+ContractDefinition::ContractKind ASTJsonImporter::contractKind(Json::Value const& _node)
+{
+	ContractDefinition::ContractKind kind;
+	astAssert(!member(_node, "contractKind").isNull(), "'Contract-kind' can not be null.");
+	if (_node["contractKind"].asString() == "interface")
+		kind = ContractDefinition::ContractKind::Interface;
+	else if (_node["contractKind"].asString() == "contract")
+		kind = ContractDefinition::ContractKind::Contract;
+	else if (_node["contractKind"].asString() == "library")
+		kind = ContractDefinition::ContractKind::Library;
+	else
+		astAssert(false, "Unknown ContractKind");
+	return kind;
+}

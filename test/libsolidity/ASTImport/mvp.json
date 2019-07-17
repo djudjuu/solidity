@@ -1,4 +1,11 @@
 {
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/mvp.sol:A":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820a1727b9733526c56bd33fa36d341df19ef35dc10ebec2297977a9bbcaab516dd64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31372b636f6d6d69742e35316463616631652e6d6f64005c"
+    }
+  },
   "sourceList":
   [
     "../test/libsolidity/ASTImport/mvp.sol"
@@ -10,8 +17,14 @@
       "AST":
       {
         "absolutePath": "../test/libsolidity/ASTImport/mvp.sol",
-        "exportedSymbols": {},
-        "id": 2,
+        "exportedSymbols":
+        {
+          "A":
+          [
+            2
+          ]
+        },
+        "id": 3,
         "nodeType": "SourceUnit",
         "nodes":
         [
@@ -26,11 +39,28 @@
             ],
             "nodeType": "PragmaDirective",
             "src": "0:23:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 2,
+            "linearizedBaseContracts":
+            [
+              2
+            ],
+            "name": "A",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 3,
+            "src": "25:13:0"
           }
         ],
-        "src": "0:24:0"
+        "src": "0:39:0"
       }
     }
   },
-  "version": "0.5.11-develop.2019.7.17+commit.7673d4cb.mod.Linux.g++"
+  "version": "0.5.11-develop.2019.7.17+commit.51dcaf1e.mod.Linux.g++"
 }

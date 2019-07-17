@@ -262,7 +262,7 @@ bool CompilerStack::importASTs(map<string, Json::Value const*> const& _sources)
 		Source source;
 		source.ast = src.second;
 		string srcString = dev::jsonCompactPrint(*m_sourceJsons[src.first]);
-		ASTPointer<Scanner> scanner = 0; // make_shared<Scanner>(CharStream(srcString), src.first);
+		ASTPointer<Scanner> scanner = make_shared<Scanner>(langutil::CharStream(srcString, src.first));
 		source.scanner = scanner;
 		m_sources[path] = source;
 	}
@@ -1102,7 +1102,7 @@ string CompilerStack::createMetadata(Contract const& _contract) const
 {
 	Json::Value meta;
 	meta["version"] = 1;
-	meta["language"] = "Solidity";
+	meta["language"] = m_importedSources ? "SolidityAST" : "Solidity";
 	meta["compiler"]["version"] = VersionStringStrict;
 
 	/// All the source files (including self), which should be included in the metadata.
