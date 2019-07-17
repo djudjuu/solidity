@@ -46,14 +46,15 @@ public:
 	void printSource(std::ostream& _stream, std::string const& _linePrefix = "", bool const _formatted = false) const override;
 	void printUpdatedExpectations(std::ostream& _stream, std::string const& _linePrefix) const override;
 private:
-	// leftover
-	std::vector<std::pair<std::string, std::string>> m_sources;
 	// sourceName->AST how it needs to be given to the compiler
 	std::map<std::string, Json::Value const*> m_sourceJsons;
+	// used to tell the ASTJsonConverter how to index the sources
 	std::map<std::string, unsigned> m_sourceIndices;
 	std::string m_expectation;
 	std::string m_astFilename;
 	std::string m_result;
+	// workaround
+	std::string m_version;
 };
 
 }

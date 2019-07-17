@@ -1,0 +1,36 @@
+{
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/mvp.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/mvp.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/mvp.sol",
+        "exportedSymbols": {},
+        "id": 2,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "id": 1,
+            "literals":
+            [
+              "solidity",
+              "^",
+              "0.5",
+              ".0"
+            ],
+            "nodeType": "PragmaDirective",
+            "src": "0:23:0"
+          }
+        ],
+        "src": "0:24:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.17+commit.7673d4cb.mod.Linux.g++"
+}

@@ -73,21 +73,11 @@ ASTImportTest::ASTImportTest(string const& _filename)
 		BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("Input file could not be parsed to JSON"));
 	}
 
-	// save ASTs of included sources as comma separated list in m_expectations
-	// TODO, only save the ASTS, separated by commas, not the stuff in between
-	ifstream file(m_astFilename);
-	if (!file)
-		BOOST_THROW_EXCEPTION(runtime_error("Cannot open test contract: \"" + _filename + "\"."));
-	file.exceptions(ios::badbit);
+	// save entire Json from input as string in m_expectations
+	m_expectation = dev::jsonPrettyPrint(*ast);
 
-	if (file)
-	{
-		string line;
-		while (getline(file, line))
-			m_expectation += line + "\n";
-	}
-
-	file.close();
+	// Workaround: save versionString to manually paste it into result
+	m_version = (*ast)["version"].asString();
 }
 
 TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePrefix, bool const _formatted)
@@ -95,43 +85,59 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 	CompilerStack c;
 
 	c.reset(false);
+	// TODO get EVM version from AST
 	c.setEVMVersion(dev::test::Options::get().evmVersion());
 
-	//use the compiler's analyzer to annotate, typecheck, etc...
+	//import & use the compiler's analyzer to annotate, typecheck, etc...
 	if (!c.importASTs(m_sourceJsons))
 	{
+		// is this the correct way to report an error here?
 		astAssert(false, "Import of the AST failed");
 		return TestResult::FatalError;
 	}
 	if (!c.analyze())
 	{
-		astAssert(false, "Analysis of the AST failed");
+		SourceReferenceFormatterHuman formatter(_stream, _formatted);
+		for (auto const& error: c.errors())
+			formatter.printErrorInformation(*error);
 		return TestResult::FatalError;
 	}
-	// TODO correctly report error like below
-	//	else
-//	{
-//		SourceReferenceFormatterHuman formatter(_stream, _formatted);
-//		for (auto const& error: c.errors())
-//			formatter.printErrorInformation(*error);
-//		return TestResult::FatalError;
-//	}
 
 	// export analyzed AST again as result
-	size_t j = 0;
-	for (auto const& srcPair: m_sourceJsons) // aka <string, Json>
+	// similar to how its done when creating combined json in CommandLineInterface's handleCombinedJson()
+	Json::Value output(Json::objectValue);
+
+	// TODO use the version from the input JSON
+	output["version"] = m_version; //dev::solidity::VersionString;
+
+	// sourceList info
+	output["sourceList"] = Json::Value(Json::arrayValue);
+	for (auto const& source: c.sourceNames())
+		output["sourceList"].append(source);
+
+	// handle contracts-object (binary, metadata...)
+	vector<string> contracts = c.contractNames();
+	if (!contracts.empty())
 	{
-		ostringstream result;
-		ASTJsonConverter(false, m_sourceIndices).print(result, c.ast(srcPair.first));
-		m_result += result.str();
-		if (j != m_sourceJsons.size() - 1)
+		output["contracts"] = Json::Value(Json::objectValue);
+		for (string const& contractName: contracts)
 		{
-			m_result += ",";
+			Json::Value& contractData = output["contracts"][contractName] = Json::objectValue;
+			contractData["bin"] = c.object(contractName).toHex();
 		}
-		m_result += "\n";
-		j++;
+	}
+	output["sources"] = Json::Value(Json::objectValue);
+	for (auto const& sourceCode: m_sourceJsons)
+	{
+		ASTJsonConverter converter(false, c.sourceIndices());
+		output["sources"][sourceCode.first] = Json::Value(Json::objectValue);
+		output["sources"][sourceCode.first]["AST"] = converter.toJson(c.ast(sourceCode.first));
 	}
 
+	// save as result
+	m_result = dev::jsonPrettyPrint(output); //m_args.count(g_argPrettyJson) ? dev::jsonPrettyPrint(output) : dev::jsonCompactPrint(output);
+
+	// compare & error reporting
 	bool resultsMatch = true;
 
 	if (m_expectation != m_result)
@@ -161,11 +167,11 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 
 void ASTImportTest::printSource(ostream& _stream, string const& _linePrefix, bool const) const
 {
-	for (auto const& source: m_sources)
+	for (auto const& source: m_sourceJsons)
 	{
-		if (m_sources.size() > 1 || source.first != "a")
+		if (m_sourceJsons.size() > 1 || source.first != "a")
 			_stream << _linePrefix << "// ---- SOURCE: " << source.first << endl << endl;
-		stringstream stream(source.second);
+		stringstream stream(dev::jsonPrettyPrint(source.second));
 		string line;
 		while (getline(stream, line))
 			_stream << _linePrefix << line << endl;
