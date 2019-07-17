@@ -40,39 +40,46 @@ using namespace boost::unit_test;
 
 ASTImportTest::ASTImportTest(string const& _filename)
 {
+	// TODO figure out where this is given a .sol file as input and change it to be the JSON
 	if (!boost::algorithm::ends_with(_filename, ".sol"))
 		BOOST_THROW_EXCEPTION(runtime_error("Invalid test contract file name: \"" + _filename + "\"."));
 
+	// use .json as input file for the test
 	m_astFilename = _filename.substr(0, _filename.size() - 4) + ".json";
 
-	ifstream file(_filename);
+	// try parsing as json
+	Json::Value* ast = new Json::Value();
+	// meanwhile set sourceIndices map so that ASTJsonConverter knows which index to give in SourceLocations
+	size_t i = 0;
+	if (jsonParseFile(m_astFilename, *ast))
+	{
+		if ((*ast).isMember("sourceList") && (*ast).isMember("sources"))
+		{
+			for (auto& src: (*ast)["sourceList"])
+			{
+				astAssert( (*ast)["sources"][src.asString()]["AST"]["nodeType"].asString() == "SourceUnit",  "Top-level node should be a 'SourceUnit'");
+				m_sourceJsons[src.asString()] = &((*ast)["sources"][src.asString()]["AST"]);
+				m_sourceIndices[src.asString()] = i;
+				i++;
+			}
+		}
+		else
+		{
+			BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("should have been option A")); //TODO make this helpful
+		}
+	}
+	else
+	{
+		BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("Input file could not be parsed to JSON"));
+	}
+
+	// save ASTs of included sources as comma separated list in m_expectations
+	// TODO, only save the ASTS, separated by commas, not the stuff in between
+	ifstream file(m_astFilename);
 	if (!file)
 		BOOST_THROW_EXCEPTION(runtime_error("Cannot open test contract: \"" + _filename + "\"."));
 	file.exceptions(ios::badbit);
 
-	string sourceName;
-	string source;
-	string line;
-	string const sourceDelimiter("// ---- SOURCE: ");
-	string const delimiter("// ----");
-	while (getline(file, line))
-	{
-		if (boost::algorithm::starts_with(line, sourceDelimiter))
-		{
-			if (!sourceName.empty())
-				m_sources.emplace_back(sourceName, source);
-
-			sourceName = line.substr(sourceDelimiter.size(), string::npos);
-			source = string();
-		}
-		else if (!line.empty() && !boost::algorithm::starts_with(line, delimiter))
-			source += line + "\n";
-	}
-
-	m_sources.emplace_back(sourceName.empty() ? "a" : sourceName, source);
-
-	file.close();
-	file.open(m_astFilename);
 	if (file)
 	{
 		string line;
@@ -87,33 +94,42 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 {
 	CompilerStack c;
 
-	StringMap sources;
-	map<string, unsigned> sourceIndices;
-	for (size_t i = 0; i < m_sources.size(); i++)
-	{
-		sources[m_sources[i].first] = m_sources[i].second;
-		sourceIndices[m_sources[i].first] = i + 1;
-	}
-	c.setSources(sources);
+	c.reset(false);
 	c.setEVMVersion(dev::test::Options::get().evmVersion());
-	if (c.parse())
-		c.analyze();
-	else
+
+	//use the compiler's analyzer to annotate, typecheck, etc...
+	if (!c.importASTs(m_sourceJsons))
 	{
-		SourceReferenceFormatterHuman formatter(_stream, _formatted);
-		for (auto const& error: c.errors())
-			formatter.printErrorInformation(*error);
+		astAssert(false, "Import of the AST failed");
 		return TestResult::FatalError;
 	}
+	if (!c.analyze())
+	{
+		astAssert(false, "Analysis of the AST failed");
+		return TestResult::FatalError;
+	}
+	// TODO correctly report error like below
+	//	else
+//	{
+//		SourceReferenceFormatterHuman formatter(_stream, _formatted);
+//		for (auto const& error: c.errors())
+//			formatter.printErrorInformation(*error);
+//		return TestResult::FatalError;
+//	}
 
-	for (size_t i = 0; i < m_sources.size(); i++)
+	// export analyzed AST again as result
+	size_t j = 0;
+	for (auto const& srcPair: m_sourceJsons) // aka <string, Json>
 	{
 		ostringstream result;
-		ASTJsonConverter(false, sourceIndices).print(result, c.ast(m_sources[i].first));
+		ASTJsonConverter(false, m_sourceIndices).print(result, c.ast(srcPair.first));
 		m_result += result.str();
-		if (i != m_sources.size() - 1)
+		if (j != m_sourceJsons.size() - 1)
+		{
 			m_result += ",";
+		}
 		m_result += "\n";
+		j++;
 	}
 
 	bool resultsMatch = true;

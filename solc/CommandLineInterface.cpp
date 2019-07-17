@@ -524,7 +524,7 @@ bool CommandLineInterface::readInputFilesAndConfigureRemappings()
 	return true;
 }
 
-//read file contents, which either are
+//read file contents from m_sourceCodes into m_sourceJsons, which either are
 // a) a json-file with multiple sources (as produced by --combined-json -ast,compact-format)
 map<string, Json::Value const*> CommandLineInterface::parseAstFromInput()
 {

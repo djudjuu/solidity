@@ -405,6 +405,7 @@ private:
 	std::map<std::string, std::set<std::string>> m_requestedContractNames;
 	bool m_generateIR;
 	bool m_generateEWasm;
+	bool m_importedSources = false;
 	std::map<std::string, h160> m_libraries;
 	/// list of path prefix remappings, e.g. mylibrary: github.com/ethereum = /usr/local/ethereum
 	/// "context:prefix=target"
@@ -425,8 +426,6 @@ private:
 	bool m_parserErrorRecovery = false;
 	State m_stackState = Empty;
 	bool m_release = VersionIsRelease;
-	bool m_importedSources = false;
-
 };
 
 }
