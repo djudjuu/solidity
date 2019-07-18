@@ -67,7 +67,7 @@ private:
 	ASTPointer<ImportDirective> createImportDirective(Json::Value const& _node);
 	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
 	ASTPointer<InheritanceSpecifier> createInheritanceSpecifier(Json::Value const& _node);
-//	ASTPointer<UsingForDirective> createUsingForDirective(Json::Value const& _node);
+	ASTPointer<UsingForDirective> createUsingForDirective(Json::Value const& _node);
 	ASTPointer<ASTNode> createStructDefinition(Json::Value const& _node);
 	ASTPointer<EnumDefinition> createEnumDefinition(Json::Value const& _node);
 	ASTPointer<EnumValue> createEnumValue(Json::Value const& _node);
@@ -81,8 +81,8 @@ private:
 	ASTPointer<ElementaryTypeName> createElementaryTypeName(Json::Value const& _node);
 	ASTPointer<UserDefinedTypeName> createUserDefinedTypeName(Json::Value const& _node);
 	ASTPointer<FunctionTypeName> createFunctionTypeName(Json::Value const& _node);
-//	ASTPointer<Mapping> createMapping(Json::Value const& _node);
-//	ASTPointer<ArrayTypeName> createArrayTypeName(Json::Value const& _node);
+	ASTPointer<Mapping> createMapping(Json::Value const& _node);
+	ASTPointer<ArrayTypeName> createArrayTypeName(Json::Value const& _node);
 //	ASTPointer<InlineAssembly> createInlineAssembly(Json::Value const& _node);
 	ASTPointer<Block> createBlock(Json::Value const& _node);
 	ASTPointer<PlaceholderStatement> createPlaceholderStatement(Json::Value const& _node);
@@ -93,19 +93,19 @@ private:
 //	ASTPointer<Break> createBreak(Json::Value const& _node);
 //	ASTPointer<Return> createReturn(Json::Value const& _node);
 //	ASTPointer<Throw> createThrow(Json::Value const& _node);
-//	ASTPointer<VariableDeclarationStatement> createVariableDeclarationStatement(Json::Value const& _node);
-//	ASTPointer<ExpressionStatement> createExpressionStatement(Json::Value const& _node);
+	ASTPointer<VariableDeclarationStatement> createVariableDeclarationStatement(Json::Value const& _node);
+	ASTPointer<ExpressionStatement> createExpressionStatement(Json::Value const& _node);
 //	ASTPointer<Conditional> createConditional(Json::Value const& _node);
-//	ASTPointer<Assignment> createAssignment(Json::Value const& _node);
+	ASTPointer<Assignment> createAssignment(Json::Value const& _node);
 //	ASTPointer<TupleExpression> createTupleExpression(Json::Value const& _node);
-//	ASTPointer<UnaryOperation> createUnaryOperation(Json::Value const& _node);
-//	ASTPointer<BinaryOperation> createBinaryOperation(Json::Value const& _node);
-//	ASTPointer<FunctionCall> createFunctionCall(Json::Value const& _node);
+	ASTPointer<UnaryOperation> createUnaryOperation(Json::Value const& _node);
+	ASTPointer<BinaryOperation> createBinaryOperation(Json::Value const& _node);
+	ASTPointer<FunctionCall> createFunctionCall(Json::Value const& _node);
 //	ASTPointer<NewExpression> createNewExpression(Json::Value const& _node);
 //	ASTPointer<MemberAccess> createMemberAccess(Json::Value const& _node);
-//	ASTPointer<IndexAccess> createIndexAccess(Json::Value const& _node);
+	ASTPointer<IndexAccess> createIndexAccess(Json::Value const& _node);
 	ASTPointer<Identifier> createIdentifier(Json::Value const& _node);
-//	ASTPointer<ElementaryTypeNameExpression> createElementaryTypeNameExpression(Json::Value const& _node);
+	ASTPointer<ElementaryTypeNameExpression> createElementaryTypeNameExpression(Json::Value const& _node);
 	ASTPointer<ASTNode> createLiteral(Json::Value const& _node);
 
 	// =============== helpers ===================

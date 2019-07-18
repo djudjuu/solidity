@@ -1,0 +1,105 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/inheritance_specifier.sol:C1":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820577a81e1d23255ffaece31be94fb2b374fedae3147b5d64f304beb5ba5ffec3064736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/inheritance_specifier.sol:C2":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820d908d5cefb2a1f713fae48c49cf73edf10cff2e4f04d7141bb81e43bcb1587c964736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/inheritance_specifier.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/inheritance_specifier.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/inheritance_specifier.sol",
+        "exportedSymbols":
+        {
+          "C1":
+          [
+            1
+          ],
+          "C2":
+          [
+            4
+          ]
+        },
+        "id": 5,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 1,
+            "linearizedBaseContracts":
+            [
+              1
+            ],
+            "name": "C1",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 5,
+            "src": "0:14:0"
+          },
+          {
+            "baseContracts":
+            [
+              {
+                "arguments": null,
+                "baseName":
+                {
+                  "contractScope": null,
+                  "id": 2,
+                  "name": "C1",
+                  "nodeType": "UserDefinedTypeName",
+                  "referencedDeclaration": 1,
+                  "src": "30:2:0",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_contract$_C1_$1",
+                    "typeString": "contract C1"
+                  }
+                },
+                "id": 3,
+                "nodeType": "InheritanceSpecifier",
+                "src": "30:2:0"
+              }
+            ],
+            "contractDependencies":
+            [
+              1
+            ],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 4,
+            "linearizedBaseContracts":
+            [
+              4,
+              1
+            ],
+            "name": "C2",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 5,
+            "src": "15:20:0"
+          }
+        ],
+        "src": "0:36:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.df4e5e17.mod.Linux.g++"
+}

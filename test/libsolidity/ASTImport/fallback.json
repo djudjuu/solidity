@@ -1,22 +1,22 @@
 {
   "contracts":
   {
-    "../test/libsolidity/ASTImport/fallback_payable.sol:C":
+    "../test/libsolidity/ASTImport/fallback.sol:C":
     {
-      "bin": "6080604052348015600f57600080fd5b50607180601d6000396000f3fe6080604052348015600f57600080fd5b5000fea265627a7a72315820822121770935f744fba5586ae31fef3abea32cb770de066f265bf100dd0fccc264736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+      "bin": "6080604052348015600f57600080fd5b50606580601d6000396000f3fe608060405200fea265627a7a723158202f19f0c2c6dd4aea1f83d3ac7fb915f7d3eee6561067dd8121b36357b525700264736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
     }
   },
   "sourceList":
   [
-    "../test/libsolidity/ASTImport/fallback_payable.sol"
+    "../test/libsolidity/ASTImport/fallback.sol"
   ],
   "sources":
   {
-    "../test/libsolidity/ASTImport/fallback_payable.sol":
+    "../test/libsolidity/ASTImport/fallback.sol":
     {
       "AST":
       {
-        "absolutePath": "../test/libsolidity/ASTImport/fallback_payable.sol",
+        "absolutePath": "../test/libsolidity/ASTImport/fallback.sol",
         "exportedSymbols":
         {
           "C":
@@ -48,7 +48,7 @@
                 {
                   "id": 3,
                   "nodeType": "Block",
-                  "src": "34:2:0",
+                  "src": "43:5:0",
                   "statements": []
                 },
                 "documentation": null,
@@ -63,27 +63,27 @@
                   "id": 1,
                   "nodeType": "ParameterList",
                   "parameters": [],
-                  "src": "22:2:0"
+                  "src": "23:2:0"
                 },
                 "returnParameters":
                 {
                   "id": 2,
                   "nodeType": "ParameterList",
                   "parameters": [],
-                  "src": "34:0:0"
+                  "src": "43:0:0"
                 },
                 "scope": 5,
-                "src": "14:22:0",
-                "stateMutability": "nonpayable",
+                "src": "15:33:0",
+                "stateMutability": "payable",
                 "superFunction": null,
                 "visibility": "external"
               }
             ],
             "scope": 6,
-            "src": "0:38:0"
+            "src": "0:50:0"
           }
         ],
-        "src": "0:39:0"
+        "src": "0:51:0"
       }
     }
   },

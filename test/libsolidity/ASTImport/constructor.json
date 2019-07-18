@@ -1,22 +1,22 @@
 {
   "contracts":
   {
-    "../test/libsolidity/ASTImport/fallback_payable.sol:C":
+    "../test/libsolidity/ASTImport/constructor.sol:C":
     {
-      "bin": "6080604052348015600f57600080fd5b50607180601d6000396000f3fe6080604052348015600f57600080fd5b5000fea265627a7a72315820822121770935f744fba5586ae31fef3abea32cb770de066f265bf100dd0fccc264736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a723158202d4e21e0e09b06ccbbc716955509fd9951bb161b0a0d36ed1611224ff7dd3f9e64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
     }
   },
   "sourceList":
   [
-    "../test/libsolidity/ASTImport/fallback_payable.sol"
+    "../test/libsolidity/ASTImport/constructor.sol"
   ],
   "sources":
   {
-    "../test/libsolidity/ASTImport/fallback_payable.sol":
+    "../test/libsolidity/ASTImport/constructor.sol":
     {
       "AST":
       {
-        "absolutePath": "../test/libsolidity/ASTImport/fallback_payable.sol",
+        "absolutePath": "../test/libsolidity/ASTImport/constructor.sol",
         "exportedSymbols":
         {
           "C":
@@ -48,13 +48,13 @@
                 {
                   "id": 3,
                   "nodeType": "Block",
-                  "src": "34:2:0",
+                  "src": "35:4:0",
                   "statements": []
                 },
                 "documentation": null,
                 "id": 4,
                 "implemented": true,
-                "kind": "fallback",
+                "kind": "constructor",
                 "modifiers": [],
                 "name": "",
                 "nodeType": "FunctionDefinition",
@@ -63,27 +63,27 @@
                   "id": 1,
                   "nodeType": "ParameterList",
                   "parameters": [],
-                  "src": "22:2:0"
+                  "src": "25:2:0"
                 },
                 "returnParameters":
                 {
                   "id": 2,
                   "nodeType": "ParameterList",
                   "parameters": [],
-                  "src": "34:0:0"
+                  "src": "35:0:0"
                 },
                 "scope": 5,
-                "src": "14:22:0",
+                "src": "14:25:0",
                 "stateMutability": "nonpayable",
                 "superFunction": null,
-                "visibility": "external"
+                "visibility": "public"
               }
             ],
             "scope": 6,
-            "src": "0:38:0"
+            "src": "0:41:0"
           }
         ],
-        "src": "0:39:0"
+        "src": "0:42:0"
       }
     }
   },

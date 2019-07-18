@@ -1,0 +1,97 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/array_type_name.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820c77b8d002b4835edea58b5c4cefc04043b5c8fabf75e10191d4360996e16e0cf64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/array_type_name.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/array_type_name.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/array_type_name.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            4
+          ]
+        },
+        "id": 5,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 4,
+            "linearizedBaseContracts":
+            [
+              4
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "constant": false,
+                "id": 3,
+                "name": "i",
+                "nodeType": "VariableDeclaration",
+                "scope": 4,
+                "src": "13:8:0",
+                "stateVariable": true,
+                "storageLocation": "default",
+                "typeDescriptions":
+                {
+                  "typeIdentifier": "t_array$_t_uint256_$dyn_storage",
+                  "typeString": "uint256[]"
+                },
+                "typeName":
+                {
+                  "baseType":
+                  {
+                    "id": 1,
+                    "name": "uint",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "13:4:0",
+                    "typeDescriptions":
+                    {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "id": 2,
+                  "length": null,
+                  "nodeType": "ArrayTypeName",
+                  "src": "13:6:0",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
+                    "typeString": "uint256[]"
+                  }
+                },
+                "value": null,
+                "visibility": "internal"
+              }
+            ],
+            "scope": 5,
+            "src": "0:24:0"
+          }
+        ],
+        "src": "0:25:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.df4e5e17.mod.Linux.g++"
+}

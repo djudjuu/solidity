@@ -1,0 +1,185 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/documentation.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a723158207316fd72ec3135149fa5414af9fdccc7bd615bad6e2b06081403d224751241dc64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/documentation.sol:D":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a7231582077dea02c8d6f05a4d2334a4af9fb7aa77f82bbadc18d8c302402f0dcb8d89e1364736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/documentation.sol:Z":
+    {
+      "bin": "6080604052348015600f57600080fd5b5060968061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063a4a2c40b14602d575b600080fd5b60336035565b005b56fea265627a7a72315820531f2813ebf26e514e3cc836fca94e5ec7293c829ee81aa1ddf83d1cdc321a0b64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/documentation.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/documentation.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/documentation.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            1
+          ],
+          "D":
+          [
+            2
+          ],
+          "Z":
+          [
+            13
+          ]
+        },
+        "id": 14,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": "This contract is empty",
+            "fullyImplemented": true,
+            "id": 1,
+            "linearizedBaseContracts":
+            [
+              1
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 14,
+            "src": "47:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": "This contract is empty\nand has a line-breaking comment.",
+            "fullyImplemented": true,
+            "id": 2,
+            "linearizedBaseContracts":
+            [
+              2
+            ],
+            "name": "D",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 14,
+            "src": "143:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 13,
+            "linearizedBaseContracts":
+            [
+              13
+            ],
+            "name": "Z",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "anonymous": false,
+                "documentation": "Some comment on Evt.",
+                "id": 4,
+                "name": "Evt",
+                "nodeType": "EventDefinition",
+                "parameters":
+                {
+                  "id": 3,
+                  "nodeType": "ParameterList",
+                  "parameters": [],
+                  "src": "228:2:0"
+                },
+                "src": "219:12:0"
+              },
+              {
+                "body":
+                {
+                  "id": 7,
+                  "nodeType": "Block",
+                  "src": "276:6:0",
+                  "statements":
+                  [
+                    {
+                      "id": 6,
+                      "nodeType": "PlaceholderStatement",
+                      "src": "278:1:0"
+                    }
+                  ]
+                },
+                "documentation": "Some comment on mod.",
+                "id": 8,
+                "name": "mod",
+                "nodeType": "ModifierDefinition",
+                "parameters":
+                {
+                  "id": 5,
+                  "nodeType": "ParameterList",
+                  "parameters": [],
+                  "src": "273:2:0"
+                },
+                "src": "261:21:0",
+                "visibility": "internal"
+              },
+              {
+                "body":
+                {
+                  "id": 11,
+                  "nodeType": "Block",
+                  "src": "332:2:0",
+                  "statements": []
+                },
+                "documentation": "Some comment on fn.",
+                "id": 12,
+                "implemented": true,
+                "kind": "function",
+                "modifiers": [],
+                "name": "fn",
+                "nodeType": "FunctionDefinition",
+                "parameters":
+                {
+                  "id": 9,
+                  "nodeType": "ParameterList",
+                  "parameters": [],
+                  "src": "322:2:0"
+                },
+                "returnParameters":
+                {
+                  "id": 10,
+                  "nodeType": "ParameterList",
+                  "parameters": [],
+                  "src": "332:0:0"
+                },
+                "scope": 13,
+                "src": "311:23:0",
+                "stateMutability": "nonpayable",
+                "superFunction": null,
+                "visibility": "public"
+              }
+            ],
+            "scope": 14,
+            "src": "177:159:0"
+          }
+        ],
+        "src": "47:290:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.df4e5e17.mod.Linux.g++"
+}

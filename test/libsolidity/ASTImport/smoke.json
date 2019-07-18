@@ -1,0 +1,54 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/smoke.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820968e4532b26e96dd78bbad9650f1f50c4c42672ea8fd7ed182ef5c0cba95ed8d64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/smoke.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/smoke.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/smoke.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            1
+          ]
+        },
+        "id": 2,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 1,
+            "linearizedBaseContracts":
+            [
+              1
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 2,
+            "src": "0:13:0"
+          }
+        ],
+        "src": "0:14:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.df4e5e17.mod.Linux.g++"
+}

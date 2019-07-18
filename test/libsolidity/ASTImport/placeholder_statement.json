@@ -1,0 +1,85 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/placeholder_statement.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820f256832435827fd2af68b1bb5c36c84ed39f95556a283ae4ae192ae751547ad564736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64663465356531372e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/placeholder_statement.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/placeholder_statement.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/placeholder_statement.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            5
+          ]
+        },
+        "id": 6,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 5,
+            "linearizedBaseContracts":
+            [
+              5
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "body":
+                {
+                  "id": 3,
+                  "nodeType": "Block",
+                  "src": "24:6:0",
+                  "statements":
+                  [
+                    {
+                      "id": 2,
+                      "nodeType": "PlaceholderStatement",
+                      "src": "26:1:0"
+                    }
+                  ]
+                },
+                "documentation": null,
+                "id": 4,
+                "name": "M",
+                "nodeType": "ModifierDefinition",
+                "parameters":
+                {
+                  "id": 1,
+                  "nodeType": "ParameterList",
+                  "parameters": [],
+                  "src": "24:0:0"
+                },
+                "src": "13:17:0",
+                "visibility": "internal"
+              }
+            ],
+            "scope": 6,
+            "src": "0:32:0"
+          }
+        ],
+        "src": "0:33:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.df4e5e17.mod.Linux.g++"
+}
