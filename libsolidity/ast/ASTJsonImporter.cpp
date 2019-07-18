@@ -46,6 +46,16 @@ ASTPointer<T> castPointer(ASTPointer<ASTNode> _ast)
 	return ret;
 }
 
+template<class T>
+ASTPointer<T> ASTJsonImporter::nullOrCast(Json::Value _json)
+{
+	if (_json.isNull())
+		return nullptr;
+	else
+		return castPointer<T>(convertJsonToASTNode(_json));
+}
+
+
 // ============ public ===========================
 
 ASTJsonImporter::ASTJsonImporter(map<string, Json::Value const*> _sourceList )
@@ -108,8 +118,8 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 		return createInheritanceSpecifier(_json);
 //	if (nodeType == "UsingForDirective")
 //		return createUsingForDirective(_json);
-//	if (nodeType == "StructDefinition")
-//		return createStructDefinition(_json);
+	if (nodeType == "StructDefinition")
+		return createStructDefinition(_json);
 	if (nodeType == "EnumDefinition")
 		return createEnumDefinition(_json);
 	if (nodeType == "EnumValue")
@@ -118,16 +128,16 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 //		return createParameterList(_json);
 //	if (nodeType == "FunctionDefinition")
 //		return createFunctionDefinition(_json);
-//	if (nodeType == "VariableDeclaration")
-//		return createVariableDeclaration(_json);
+	if (nodeType == "VariableDeclaration")
+		return createVariableDeclaration(_json);
 //	if (nodeType == "ModifierDefinition")
 //		return createModifierDefinition(_json);
 //	if (nodeType == "ModifierInvocation")
 //		return createModifierInvocation(_json);
 //	if (nodeType == "EventDefinition")
 //		return createEventDefinition(_json);
-//	if (nodeType == "ElementaryTypeName")
-//		return createElementaryTypeName(_json);
+	if (nodeType == "ElementaryTypeName")
+		return createElementaryTypeName(_json);
 	if (nodeType == "UserDefinedTypeName")
 		return createUserDefinedTypeName(_json);
 //	if (nodeType == "FunctionTypeName")
@@ -289,17 +299,17 @@ ASTPointer<UserDefinedTypeName> ASTJsonImporter::createUserDefinedTypeName(Json:
 //	);
 //}
 
-//ASTPointer<ASTNode> ASTJsonImporter::createStructDefinition(Json::Value const& _node)
-//{
-//	std::vector<ASTPointer<VariableDeclaration>> members;
-//	for (auto& member: _node["members"])
-//		members.push_back(createVariableDeclaration(member));
-//	return createASTNode<StructDefinition>(
-//		_node,
-//		memberAsASTString(_node, "name"),
-//		members
-//	);
-//}
+ASTPointer<ASTNode> ASTJsonImporter::createStructDefinition(Json::Value const& _node)
+{
+	std::vector<ASTPointer<VariableDeclaration>> members;
+	for (auto& member: _node["members"])
+		members.push_back(createVariableDeclaration(member));
+	return createASTNode<StructDefinition>(
+		_node,
+		memberAsASTString(_node, "name"),
+		members
+	);
+}
 
 ASTPointer<EnumDefinition> ASTJsonImporter::createEnumDefinition(Json::Value const& _node)
 {
@@ -352,20 +362,20 @@ ASTPointer<EnumValue> ASTJsonImporter::createEnumValue(Json::Value const& _node)
 
 //}
 
-//ASTPointer<VariableDeclaration> ASTJsonImporter::createVariableDeclaration(Json::Value const& _node)
-//{
-//	return createASTNode<VariableDeclaration>(
-//		_node,
-//		nullOrCast<TypeName>(member(_node, "typeName")),
-//		make_shared<ASTString>(member(_node, "name").asString()),
-//		nullOrCast<Expression>(member(_node, "value")),
-//		visibility(_node),
-//		memberAsBool(_node, "stateVariable"),
-//		_node.isMember("indexed") ? memberAsBool(_node, "indexed") : false,
-//		memberAsBool(_node, "constant"),
-//		location(_node)
-//	);
-//}
+ASTPointer<VariableDeclaration> ASTJsonImporter::createVariableDeclaration(Json::Value const& _node)
+{
+	return createASTNode<VariableDeclaration>(
+		_node,
+		nullOrCast<TypeName>(member(_node, "typeName")),
+		make_shared<ASTString>(member(_node, "name").asString()),
+		nullOrCast<Expression>(member(_node, "value")),
+		visibility(_node),
+		memberAsBool(_node, "stateVariable"),
+		_node.isMember("indexed") ? memberAsBool(_node, "indexed") : false,
+		memberAsBool(_node, "constant"),
+		location(_node)
+	);
+}
 
 
 //ASTPointer<ModifierDefinition> ASTJsonImporter::createModifierDefinition(Json::Value const&  _node)
@@ -405,20 +415,19 @@ ASTPointer<EnumValue> ASTJsonImporter::createEnumValue(Json::Value const& _node)
 
 //}
 
-//ASTPointer<ElementaryTypeName> ASTJsonImporter::createElementaryTypeName(Json::Value const& _node)
-//{
-//	unsigned short firstNum;
-//	unsigned short secondNum;
-//	string name = member(_node, "name").asString();
-//	Token::Value token;
-//	tie(token, firstNum, secondNum) = Token::fromIdentifierOrKeyword(name);
-//	ElementaryTypeNameToken elem(token, firstNum,  secondNum);
-//	return createASTNode<ElementaryTypeName>(
-//		_node,
-//		elem
-//	);
-
-//}
+ASTPointer<ElementaryTypeName> ASTJsonImporter::createElementaryTypeName(Json::Value const& _node)
+{
+	unsigned short firstNum;
+	unsigned short secondNum;
+	string name = member(_node, "name").asString();
+	Token token;
+	tie(token, firstNum, secondNum) = TokenTraits::fromIdentifierOrKeyword(name);
+	ElementaryTypeNameToken elem(token, firstNum,  secondNum);
+	return createASTNode<ElementaryTypeName>(
+		_node,
+		elem
+	);
+}
 
 //ASTPointer<UserDefinedTypeName> ASTJsonImporter::createUserDefinedTypeName(Json::Value const& _node)
 //{
@@ -790,39 +799,42 @@ ContractDefinition::ContractKind ASTJsonImporter::contractKind(Json::Value const
 //	return tok;
 //}
 
-//Declaration::Visibility ASTJsonImporter::visibility(Json::Value const& _node)
-//{
-//	astAssert(!member(_node, "visibility").isNull(), "'visibility' can not be null.");
-//	Declaration::Visibility vis;
-//	if (_node["visibility"].asString() == "default")
-//		vis = Declaration::Visibility::Default;
-//	else if (_node["visibility"].asString() == "private")
-//		vis = Declaration::Visibility::Private;
-//	else if ( _node["visibility"].asString() == "internal")
-//		vis = Declaration::Visibility::Internal;
-//	else if (_node["visibility"].asString() == "public")
-//		vis = Declaration::Visibility::Public;
-//	else if (_node["visibility"].asString() == "external")
-//		vis = Declaration::Visibility::External;
-//	else
-//		astAssert(false, "Unknown visibility declaration");
-//	return vis;
-//}
+Declaration::Visibility ASTJsonImporter::visibility(Json::Value const& _node)
+{
+	astAssert(!member(_node, "visibility").isNull(), "'visibility' can not be null.");
+	Declaration::Visibility vis;
+	if (_node["visibility"].asString() == "default")
+		vis = Declaration::Visibility::Default;
+	else if (_node["visibility"].asString() == "private")
+		vis = Declaration::Visibility::Private;
+	else if ( _node["visibility"].asString() == "internal")
+		vis = Declaration::Visibility::Internal;
+	else if (_node["visibility"].asString() == "public")
+		vis = Declaration::Visibility::Public;
+	else if (_node["visibility"].asString() == "external")
+		vis = Declaration::Visibility::External;
+	else
+		astAssert(false, "Unknown visibility declaration");
+	return vis;
+}
 
-//VariableDeclaration::Location ASTJsonImporter::location(Json::Value const& _node)
-//{
-//	VariableDeclaration::Location loc;
-//	astAssert(!member(_node, "storageLocation").isNull(), "'storageLocation' can not be null.");
-//	if (_node["storageLocation"].asString() == "default")
-//		loc = VariableDeclaration::Location::Default;
-//	else if (_node["storageLocation"].asString() == "storage")
-//		loc = VariableDeclaration::Location::Storage;
-//	else if (_node["storageLocation"].asString() == "memory")
-//		loc = VariableDeclaration::Location::Memory;
-//	else
-//		astAssert(false, "Unknown location declaration");
-//	return loc;
-//}
+VariableDeclaration::Location ASTJsonImporter::location(Json::Value const& _node)
+{
+	VariableDeclaration::Location loc;
+	astAssert(!member(_node, "storageLocation").isNull(), "'storageLocation' can not be null.");
+	if (_node["storageLocation"].asString() == "default")
+		loc = VariableDeclaration::Location::Unspecified;
+	else if (_node["storageLocation"].asString() == "storage")
+		loc = VariableDeclaration::Location::Storage;
+	else if (_node["storageLocation"].asString() == "memory")
+		loc = VariableDeclaration::Location::Memory;
+	else if (_node["storageLocation"].asString() == "calldata")
+		loc = VariableDeclaration::Location::CallData;
+
+	else
+		astAssert(false, "Unknown location declaration");
+	return loc;
+}
 
 //Literal::SubDenomination ASTJsonImporter::subdenomination(Json::Value const& _node)
 //{

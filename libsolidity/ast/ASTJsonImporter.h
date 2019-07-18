@@ -68,17 +68,17 @@ private:
 	ASTPointer<ContractDefinition> createContractDefinition(Json::Value const& _node);
 	ASTPointer<InheritanceSpecifier> createInheritanceSpecifier(Json::Value const& _node);
 //	ASTPointer<UsingForDirective> createUsingForDirective(Json::Value const& _node);
-//	ASTPointer<ASTNode> createStructDefinition(Json::Value const& _node);
+	ASTPointer<ASTNode> createStructDefinition(Json::Value const& _node);
 	ASTPointer<EnumDefinition> createEnumDefinition(Json::Value const& _node);
 	ASTPointer<EnumValue> createEnumValue(Json::Value const& _node);
 //	ASTPointer<ParameterList> createParameterList(Json::Value const& _node);
 //	ASTPointer<FunctionDefinition> createFunctionDefinition(Json::Value const& _node);
-//	ASTPointer<VariableDeclaration> createVariableDeclaration(Json::Value const& _node);
+	ASTPointer<VariableDeclaration> createVariableDeclaration(Json::Value const& _node);
 
 //	ASTPointer<ModifierDefinition> createModifierDefinition(Json::Value const& _node);
 //	ASTPointer<ModifierInvocation> createModifierInvocation(Json::Value const& _node);
 //	ASTPointer<EventDefinition> createEventDefinition(Json::Value const& _node);
-//	ASTPointer<ElementaryTypeName> createElementaryTypeName(Json::Value const& _node);
+	ASTPointer<ElementaryTypeName> createElementaryTypeName(Json::Value const& _node);
 	ASTPointer<UserDefinedTypeName> createUserDefinedTypeName(Json::Value const& _node);
 //	ASTPointer<FunctionTypeName> createFunctionTypeName(Json::Value const& _node);
 //	ASTPointer<Mapping> createMapping(Json::Value const& _node);
@@ -122,10 +122,9 @@ private:
 	// ============== JSON to definition helpers ===============
 	ASTPointer<ASTString> memberAsASTString(Json::Value const& _node, std::string const& _name);
 	bool memberAsBool(Json::Value const& _node, std::string const& _name);
-
-	//	Declaration::Visibility visibility(Json::Value const& _node);
-//	StateMutability stateMutability(Json::Value const& _node);
-//	VariableDeclaration::Location location(Json::Value const& _node);
+	Declaration::Visibility visibility(Json::Value const& _node);
+	StateMutability stateMutability(Json::Value const& _node);
+	VariableDeclaration::Location location(Json::Value const& _node);
 	ContractDefinition::ContractKind contractKind(Json::Value const& _node);
 //	Literal::SubDenomination subdenomination(Json::Value const& _node);
 

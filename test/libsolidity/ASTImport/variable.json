@@ -1,0 +1,85 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/variable.sol:A":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a723158209141be9c9cd232afe71c7abfb6a7992f71a2e25bbab58e6f8780086e571fc7bb64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e63373265323639332e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/variable.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/variable.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/variable.sol",
+        "exportedSymbols":
+        {
+          "A":
+          [
+            3
+          ]
+        },
+        "id": 4,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 3,
+            "linearizedBaseContracts":
+            [
+              3
+            ],
+            "name": "A",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "constant": false,
+                "id": 2,
+                "name": "x",
+                "nodeType": "VariableDeclaration",
+                "scope": 3,
+                "src": "15:6:0",
+                "stateVariable": true,
+                "storageLocation": "default",
+                "typeDescriptions":
+                {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName":
+                {
+                  "id": 1,
+                  "name": "uint",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "15:4:0",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "value": null,
+                "visibility": "internal"
+              }
+            ],
+            "scope": 4,
+            "src": "0:24:0"
+          }
+        ],
+        "src": "0:25:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.c72e2693.mod.Linux.g++"
+}
