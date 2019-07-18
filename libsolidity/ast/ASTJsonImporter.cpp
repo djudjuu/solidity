@@ -124,34 +124,34 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 		return createEnumDefinition(_json);
 	if (nodeType == "EnumValue")
 		return createEnumValue(_json);
-//	if (nodeType == "ParameterList")
-//		return createParameterList(_json);
-//	if (nodeType == "FunctionDefinition")
-//		return createFunctionDefinition(_json);
+	if (nodeType == "ParameterList")
+		return createParameterList(_json);
+	if (nodeType == "FunctionDefinition")
+		return createFunctionDefinition(_json);
 	if (nodeType == "VariableDeclaration")
 		return createVariableDeclaration(_json);
-//	if (nodeType == "ModifierDefinition")
-//		return createModifierDefinition(_json);
-//	if (nodeType == "ModifierInvocation")
-//		return createModifierInvocation(_json);
-//	if (nodeType == "EventDefinition")
-//		return createEventDefinition(_json);
+	if (nodeType == "ModifierDefinition")
+		return createModifierDefinition(_json);
+	if (nodeType == "ModifierInvocation")
+		return createModifierInvocation(_json);
+	if (nodeType == "EventDefinition")
+		return createEventDefinition(_json);
 	if (nodeType == "ElementaryTypeName")
 		return createElementaryTypeName(_json);
 	if (nodeType == "UserDefinedTypeName")
 		return createUserDefinedTypeName(_json);
-//	if (nodeType == "FunctionTypeName")
-//		return createFunctionTypeName(_json);
+	if (nodeType == "FunctionTypeName")
+		return createFunctionTypeName(_json);
 //	if (nodeType == "Mapping")
 //		return createMapping(_json);
 //	if (nodeType == "ArrayTypeName")
 //		return createArrayTypeName(_json);
 //	if (_json["nodeType"] == "InlineAssembly")
 //		return createInlineAssembly(_json);
-//	if (nodeType == "Block")
-//		return createBlock(_json);
-//	if (nodeType == "PlaceholderStatement")
-//		return createPlaceholderStatement(_json);
+	if (nodeType == "Block")
+		return createBlock(_json);
+	if (nodeType == "PlaceholderStatement")
+		return createPlaceholderStatement(_json);
 //	if (nodeType == "IfStatement")
 //		return createIfStatement(_json);
 //	if (nodeType == "WhileStatement")
@@ -190,12 +190,12 @@ ASTPointer<ASTNode> ASTJsonImporter::convertJsonToASTNode(Json::Value const& _js
 //		return createMemberAccess(_json);
 //	if (nodeType == "IndexAccess")
 //		return createIndexAccess(_json);
-//	if (nodeType == "Identifier")
-//		return createIdentifier(_json);
+	if (nodeType == "Identifier")
+		return createIdentifier(_json);
 //	if (nodeType == "ElementaryTypeNameExpression")
 //		return createElementaryTypeNameExpression(_json);
-//	if (nodeType == "Literal")
-//		return createLiteral(_json);
+	if (nodeType == "Literal")
+		return createLiteral(_json);
 	else
 		BOOST_THROW_EXCEPTION(langutil::InvalidAstError() << errinfo_comment("Unknown type of ASTNode."));
 }
@@ -224,7 +224,6 @@ ASTPointer<PragmaDirective> ASTJsonImporter::createPragmaDirective(Json::Value c
 	}
 	return createASTNode<PragmaDirective>(_node, tokens, literals);
 }
-
 
 ASTPointer<ImportDirective> ASTJsonImporter::createImportDirective(Json::Value const& _node){
 	ASTPointer<ASTString> unitAlias = memberAsASTString(_node, "unitAlias");
@@ -276,20 +275,6 @@ ASTPointer<InheritanceSpecifier> ASTJsonImporter::createInheritanceSpecifier(Jso
 	);
 }
 
-ASTPointer<UserDefinedTypeName> ASTJsonImporter::createUserDefinedTypeName(Json::Value const& _node)
-{
-	vector<ASTString> namePath;
-	vector<string> strs;
-	string nameString = member(_node, "name").asString();
-	boost::algorithm::split(strs, nameString, boost::is_any_of("."));
-	for (string s : strs)
-		namePath.push_back(ASTString(s));
-	return createASTNode<UserDefinedTypeName>(
-		_node,
-		namePath
-	);
-}
-
 //ASTPointer<UsingForDirective> ASTJsonImporter::createUsingForDirective(Json::Value const& _node)
 //{
 //	return createASTNode<UsingForDirective>(
@@ -331,36 +316,35 @@ ASTPointer<EnumValue> ASTJsonImporter::createEnumValue(Json::Value const& _node)
 	);
 }
 
-//ASTPointer<ParameterList> ASTJsonImporter::createParameterList(Json::Value const&  _node)
-//{
-//	std::vector<ASTPointer<VariableDeclaration>> parameters;
-//	for (auto& param: _node["parameters"])
-//		parameters.push_back(createVariableDeclaration(param));
-//	return createASTNode<ParameterList>(
-//		_node,
-//		parameters
-//	);
-//}
+ASTPointer<ParameterList> ASTJsonImporter::createParameterList(Json::Value const&  _node)
+{
+	std::vector<ASTPointer<VariableDeclaration>> parameters;
+	for (auto& param: _node["parameters"])
+		parameters.push_back(createVariableDeclaration(param));
+	return createASTNode<ParameterList>(
+		_node,
+		parameters
+	);
+}
 
-//ASTPointer<FunctionDefinition> ASTJsonImporter::createFunctionDefinition(Json::Value const&  _node)
-//{
-//	std::vector<ASTPointer<ModifierInvocation>> modifiers;
-//	for (auto& mod: member(_node, "modifiers"))
-//		modifiers.push_back(createModifierInvocation(mod));
-//	return createASTNode<FunctionDefinition>(
-//		_node,
-//		memberAsASTString(_node, "name"),
-//		visibility(_node),
-//		stateMutability(_node),
-//		memberAsBool(_node, "isConstructor"),
-//		nullOrASTString(_node, "documentation"),
-//		createParameterList(member(_node, "parameters")),
-//		modifiers,
-//		createParameterList(member(_node, "returnParameters")),
-//		memberAsBool(_node, "implemented") ? createBlock(member(_node, "body")) : nullptr
-//	);
-
-//}
+ASTPointer<FunctionDefinition> ASTJsonImporter::createFunctionDefinition(Json::Value const&  _node)
+{
+	std::vector<ASTPointer<ModifierInvocation>> modifiers;
+	for (auto& mod: member(_node, "modifiers"))
+		modifiers.push_back(createModifierInvocation(mod));
+	return createASTNode<FunctionDefinition>(
+		_node,
+		memberAsASTString(_node, "name"),
+		visibility(_node),
+		stateMutability(_node),
+		member(_node, "kind").asString() == "constructor",
+		nullOrASTString(_node, "documentation"),
+		createParameterList(member(_node, "parameters")),
+		modifiers,
+		createParameterList(member(_node, "returnParameters")),
+		memberAsBool(_node, "implemented") ? createBlock(member(_node, "body")) : nullptr
+	);
+}
 
 ASTPointer<VariableDeclaration> ASTJsonImporter::createVariableDeclaration(Json::Value const& _node)
 {
@@ -377,43 +361,39 @@ ASTPointer<VariableDeclaration> ASTJsonImporter::createVariableDeclaration(Json:
 	);
 }
 
+ASTPointer<ModifierDefinition> ASTJsonImporter::createModifierDefinition(Json::Value const&  _node)
+{
+	return createASTNode<ModifierDefinition>(
+		_node,
+		memberAsASTString(_node, "name"),
+		nullOrASTString(_node,"documentation"),
+		createParameterList(member(_node, "parameters")),
+		createBlock(member(_node, "body"))
+	);
+}
 
-//ASTPointer<ModifierDefinition> ASTJsonImporter::createModifierDefinition(Json::Value const&  _node)
-//{
-//	return createASTNode<ModifierDefinition>(
-//		_node,
-//		memberAsASTString(_node, "name"),
-//		nullOrASTString(_node,"documentation"),
-//		createParameterList(member(_node, "parameters")),
-//		createBlock(member(_node, "body"))
-//	);
+ASTPointer<ModifierInvocation> ASTJsonImporter::createModifierInvocation(Json::Value const&  _node)
+{
+	std::vector<ASTPointer<Expression>> arguments;
+	for (auto& arg: member(_node, "arguments"))
+		arguments.push_back(castPointer<Expression>(convertJsonToASTNode(arg)));
+	return createASTNode<ModifierInvocation>(
+		_node,
+		createIdentifier(member(_node, "modifierName")),
+		make_unique<std::vector<ASTPointer<Expression>>>(arguments)
+	);
+}
 
-//}
-
-//ASTPointer<ModifierInvocation> ASTJsonImporter::createModifierInvocation(Json::Value const&  _node)
-//{
-//	std::vector<ASTPointer<Expression>> arguments;
-//	for (auto& arg: member(_node, "arguments"))
-//		arguments.push_back(castPointer<Expression>(convertJsonToASTNode(arg)));
-//	return createASTNode<ModifierInvocation>(
-//		_node,
-//		createIdentifier(member(_node, "modifierName")),
-//		arguments
-//	);
-
-//}
-
-//ASTPointer<EventDefinition> ASTJsonImporter::createEventDefinition(Json::Value const&  _node)
-//{
-//	return createASTNode<EventDefinition>(
-//		_node,
-//		memberAsASTString(_node, "name"),
-//		nullOrASTString(_node, "documentation"),
-//		createParameterList(member(_node, "parameters")),
-//		memberAsBool(_node, "anonymous")
-//	);
-
-//}
+ASTPointer<EventDefinition> ASTJsonImporter::createEventDefinition(Json::Value const&  _node)
+{
+	return createASTNode<EventDefinition>(
+		_node,
+		memberAsASTString(_node, "name"),
+		nullOrASTString(_node, "documentation"),
+		createParameterList(member(_node, "parameters")),
+		memberAsBool(_node, "anonymous")
+	);
+}
 
 ASTPointer<ElementaryTypeName> ASTJsonImporter::createElementaryTypeName(Json::Value const& _node)
 {
@@ -429,32 +409,30 @@ ASTPointer<ElementaryTypeName> ASTJsonImporter::createElementaryTypeName(Json::V
 	);
 }
 
-//ASTPointer<UserDefinedTypeName> ASTJsonImporter::createUserDefinedTypeName(Json::Value const& _node)
-//{
-//	vector<ASTString> namePath;
-//	vector<string> strs;
-//	string nameString = member(_node, "name").asString();
-//	boost::algorithm::split(strs, nameString, boost::is_any_of("."));
-//	for (string s : strs)
-//		namePath.push_back(ASTString(s));
-//	return createASTNode<UserDefinedTypeName>(
-//		_node,
-//		namePath
-//	);
+ASTPointer<UserDefinedTypeName> ASTJsonImporter::createUserDefinedTypeName(Json::Value const& _node)
+{
+	vector<ASTString> namePath;
+	vector<string> strs;
+	string nameString = member(_node, "name").asString();
+	boost::algorithm::split(strs, nameString, boost::is_any_of("."));
+	for (string s : strs)
+		namePath.push_back(ASTString(s));
+	return createASTNode<UserDefinedTypeName>(
+		_node,
+		namePath
+	);
+}
 
-//}
-
-//ASTPointer<FunctionTypeName> ASTJsonImporter::createFunctionTypeName(Json::Value const&  _node)
-//{
-//	return createASTNode<FunctionTypeName>(
-//		_node,
-//		createParameterList(member(_node, "parameterTypes")),
-//		createParameterList(member(_node, "returnParameterTypes")),
-//		visibility(_node),
-//		stateMutability(_node)
-//	);
-
-//}
+ASTPointer<FunctionTypeName> ASTJsonImporter::createFunctionTypeName(Json::Value const&  _node)
+{
+	return createASTNode<FunctionTypeName>(
+		_node,
+		createParameterList(member(_node, "parameterTypes")),
+		createParameterList(member(_node, "returnParameterTypes")),
+		visibility(_node),
+		stateMutability(_node)
+	);
+}
 
 //ASTPointer<Mapping> ASTJsonImporter::createMapping(Json::Value const&  _node)
 //{
@@ -492,25 +470,25 @@ ASTPointer<ElementaryTypeName> ASTJsonImporter::createElementaryTypeName(Json::V
 //	);
 //}
 
-//ASTPointer<Block> ASTJsonImporter::createBlock(Json::Value const&  _node)
-//{
-//	std::vector<ASTPointer<Statement>> statements;
-//	for (auto& stat: member(_node, "statements"))
-//		statements.push_back(castPointer<Statement>(convertJsonToASTNode(stat)));
-//	return createASTNode<Block>(
-//		_node,
-//		nullOrASTString(_node, "documentation"),
-//		statements
-//	);
-//}
+ASTPointer<Block> ASTJsonImporter::createBlock(Json::Value const&  _node)
+{
+	std::vector<ASTPointer<Statement>> statements;
+	for (auto& stat: member(_node, "statements"))
+		statements.push_back(castPointer<Statement>(convertJsonToASTNode(stat)));
+	return createASTNode<Block>(
+		_node,
+		nullOrASTString(_node, "documentation"),
+		statements
+	);
+}
 
-//ASTPointer<PlaceholderStatement> ASTJsonImporter::createPlaceholderStatement(Json::Value const&  _node)
-//{
-//	return createASTNode<PlaceholderStatement>(
-//		_node,
-//		nullOrASTString(_node, "documentation")
-//	);
-//}
+ASTPointer<PlaceholderStatement> ASTJsonImporter::createPlaceholderStatement(Json::Value const&  _node)
+{
+	return createASTNode<PlaceholderStatement>(
+		_node,
+		nullOrASTString(_node, "documentation")
+	);
+}
 
 //ASTPointer<IfStatement> ASTJsonImporter::createIfStatement(Json::Value const&  _node)
 //{
@@ -717,19 +695,19 @@ ASTPointer<Identifier> ASTJsonImporter::createIdentifier(Json::Value const& _nod
 //	);
 //}
 
-//ASTPointer<ASTNode> ASTJsonImporter::createLiteral(Json::Value const&  _node)
-//{
-//	astAssert(!member(_node, "value").isNull() || !member(_node, "hexValue").isNull(), "Literal-value is unset.");
-//	ASTPointer<ASTString> value = _node["value"].isNull() ?
-//				make_shared<ASTString>(asString(fromHex(_node["hexValue"].asString()))):
-//				make_shared<ASTString>(_node["value"].asString());
-//	return createASTNode<Literal>(
-//		_node,
-//		literalTokenKind(_node),
-//		value,
-//		member(_node, "subdenomination").isNull() ? Literal::SubDenomination::None : subdenomination(_node)
-//	);
-//}
+ASTPointer<ASTNode> ASTJsonImporter::createLiteral(Json::Value const&  _node)
+{
+	astAssert(!member(_node, "value").isNull() || !member(_node, "hexValue").isNull(), "Literal-value is unset.");
+	ASTPointer<ASTString> value = _node["value"].isNull() ?
+				make_shared<ASTString>(asString(fromHex(_node["hexValue"].asString()))):
+				make_shared<ASTString>(_node["value"].asString());
+	return createASTNode<Literal>(
+		_node,
+		literalTokenKind(_node),
+		value,
+		member(_node, "subdenomination").isNull() ? Literal::SubDenomination::None : subdenomination(_node)
+	);
+}
 
 
 
@@ -784,20 +762,20 @@ ContractDefinition::ContractKind ASTJsonImporter::contractKind(Json::Value const
 	return kind;
 }
 
-//Token::Value ASTJsonImporter::literalTokenKind(Json::Value const& _node)
-//{
-//	astAssert(!member(_node, "kind").isNull(), "Token-'kind' can not be null.");
-//	Token::Value tok;
-//	if (_node["kind"].asString() == "number")
-//		tok = Token::Number;
-//	else if (_node["kind"].asString() == "string")
-//		tok = Token::StringLiteral;
-//	else if (_node["kind"].asString() == "bool")
-//		 tok = (member(_node, "value").asString() == "true") ? Token::TrueLiteral : Token::FalseLiteral;
-//	else
-//		astAssert(false, "Unknown kind of literalString");
-//	return tok;
-//}
+Token ASTJsonImporter::literalTokenKind(Json::Value const& _node)
+{
+	astAssert(!member(_node, "kind").isNull(), "Token-'kind' can not be null.");
+	Token tok;
+	if (_node["kind"].asString() == "number")
+		tok = Token::Number;
+	else if (_node["kind"].asString() == "string")
+		tok = Token::StringLiteral;
+	else if (_node["kind"].asString() == "bool")
+		 tok = (member(_node, "value").asString() == "true") ? Token::TrueLiteral : Token::FalseLiteral;
+	else
+		astAssert(false, "Unknown kind of literalString");
+	return tok;
+}
 
 Declaration::Visibility ASTJsonImporter::visibility(Json::Value const& _node)
 {
@@ -836,47 +814,47 @@ VariableDeclaration::Location ASTJsonImporter::location(Json::Value const& _node
 	return loc;
 }
 
-//Literal::SubDenomination ASTJsonImporter::subdenomination(Json::Value const& _node)
-//{
-//	Literal::SubDenomination kind;
-//	if (member(_node, "subdenomination").isNull())
-//		kind = Literal::SubDenomination::None;
-//	else if (_node["subdenomination"].asString() == "wei")
-//		kind = Literal::SubDenomination::Wei;
-//	else if (_node["subdenomination"].asString() == "szabo")
-//		kind = Literal::SubDenomination::Szabo;
-//	else if (_node["subdenomination"].asString() == "finney")
-//		kind = Literal::SubDenomination::Finney;
-//	else if (_node["subdenomination"].asString() == "ether")
-//		kind = Literal::SubDenomination::Ether;
-//	else if (_node["subdenomination"].asString() == "second")
-//		kind = Literal::SubDenomination::Second;
-//	else if (_node["subdenomination"].asString() == "hour")
-//		kind = Literal::SubDenomination::Hour;
-//	else if (_node["subdenomination"].asString() == "day")
-//		kind = Literal::SubDenomination::Day;
-//	else if (_node["subdenomination"].asString() == "week")
-//		kind = Literal::SubDenomination::Week;
-//	else if (_node["subdenomination"].asString() == "year")
-//		kind = Literal::SubDenomination::Year;
-//	else
-//		astAssert(false, "Unknown subdenomination");
-//	return kind;
-//}
+Literal::SubDenomination ASTJsonImporter::subdenomination(Json::Value const& _node)
+{
+	Literal::SubDenomination kind;
+	if (member(_node, "subdenomination").isNull())
+		kind = Literal::SubDenomination::None;
+	else if (_node["subdenomination"].asString() == "wei")
+		kind = Literal::SubDenomination::Wei;
+	else if (_node["subdenomination"].asString() == "szabo")
+		kind = Literal::SubDenomination::Szabo;
+	else if (_node["subdenomination"].asString() == "finney")
+		kind = Literal::SubDenomination::Finney;
+	else if (_node["subdenomination"].asString() == "ether")
+		kind = Literal::SubDenomination::Ether;
+	else if (_node["subdenomination"].asString() == "second")
+		kind = Literal::SubDenomination::Second;
+	else if (_node["subdenomination"].asString() == "hour")
+		kind = Literal::SubDenomination::Hour;
+	else if (_node["subdenomination"].asString() == "day")
+		kind = Literal::SubDenomination::Day;
+	else if (_node["subdenomination"].asString() == "week")
+		kind = Literal::SubDenomination::Week;
+	else if (_node["subdenomination"].asString() == "year")
+		kind = Literal::SubDenomination::Year;
+	else
+		astAssert(false, "Unknown subdenomination");
+	return kind;
+}
 
-//StateMutability ASTJsonImporter::stateMutability(Json::Value const& _node)
-//{
-//	StateMutability mutability;
-//	astAssert(!member(_node, "stateMutability").isNull(), "StateMutability' can not be null.");
-//	if (_node["stateMutability"].asString() == "pure")
-//		mutability = StateMutability::Pure;
-//	else if (_node["stateMutability"].asString() == "view")
-//		mutability = StateMutability::View;
-//	else if (_node["stateMutability"].asString() == "nonpayable")
-//		mutability = StateMutability::NonPayable;
-//	else if (_node["stateMutability"].asString() == "payable")
-//		mutability = StateMutability::Payable;
-//	else
-//		astAssert(false, "Unknown stateMutability");
-//	return mutability;
-//}
+StateMutability ASTJsonImporter::stateMutability(Json::Value const& _node)
+{
+	StateMutability mutability;
+	astAssert(!member(_node, "stateMutability").isNull(), "StateMutability' can not be null.");
+	if (_node["stateMutability"].asString() == "pure")
+		mutability = StateMutability::Pure;
+	else if (_node["stateMutability"].asString() == "view")
+		mutability = StateMutability::View;
+	else if (_node["stateMutability"].asString() == "nonpayable")
+		mutability = StateMutability::NonPayable;
+	else if (_node["stateMutability"].asString() == "payable")
+		mutability = StateMutability::Payable;
+	else
+		astAssert(false, "Unknown stateMutability");
+	return mutability;
+}

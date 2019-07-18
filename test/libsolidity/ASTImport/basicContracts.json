@@ -1,0 +1,129 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/basicContracts.sol:A":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820e93eaa76948b656d7e87a0b8bcc499ab93de0e1104a15db3c3d77eb43c409a6b64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e33396434663061352e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/basicContracts.sol:B":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820dc85048866b061a753ac3c30d29f1ba924ce5c82ee2f8b6480e357cfbc022c3e64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e33396434663061352e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/basicContracts.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a7231582069f3b3b2d96b1876b1355bfe9c7b9a0281a4d87c7f24225e1bdd466b19130da764736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e33396434663061352e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/basicContracts.sol:D":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820f2e8ad2da97e28af495afa4f8f441397de5bc5d7172bacb942791a48f5ddd25364736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e33396434663061352e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/basicContracts.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/basicContracts.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/basicContracts.sol",
+        "exportedSymbols":
+        {
+          "A":
+          [
+            1
+          ],
+          "B":
+          [
+            2
+          ],
+          "C":
+          [
+            3
+          ],
+          "D":
+          [
+            4
+          ]
+        },
+        "id": 5,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 1,
+            "linearizedBaseContracts":
+            [
+              1
+            ],
+            "name": "A",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 5,
+            "src": "0:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 2,
+            "linearizedBaseContracts":
+            [
+              2
+            ],
+            "name": "B",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 5,
+            "src": "14:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 3,
+            "linearizedBaseContracts":
+            [
+              3
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 5,
+            "src": "28:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 4,
+            "linearizedBaseContracts":
+            [
+              4
+            ],
+            "name": "D",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 5,
+            "src": "42:13:0"
+          }
+        ],
+        "src": "0:56:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.39d4f0a5.mod.Linux.g++"
+}

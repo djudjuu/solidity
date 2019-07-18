@@ -71,21 +71,21 @@ private:
 	ASTPointer<ASTNode> createStructDefinition(Json::Value const& _node);
 	ASTPointer<EnumDefinition> createEnumDefinition(Json::Value const& _node);
 	ASTPointer<EnumValue> createEnumValue(Json::Value const& _node);
-//	ASTPointer<ParameterList> createParameterList(Json::Value const& _node);
-//	ASTPointer<FunctionDefinition> createFunctionDefinition(Json::Value const& _node);
+	ASTPointer<ParameterList> createParameterList(Json::Value const& _node);
+	ASTPointer<FunctionDefinition> createFunctionDefinition(Json::Value const& _node);
 	ASTPointer<VariableDeclaration> createVariableDeclaration(Json::Value const& _node);
 
-//	ASTPointer<ModifierDefinition> createModifierDefinition(Json::Value const& _node);
-//	ASTPointer<ModifierInvocation> createModifierInvocation(Json::Value const& _node);
-//	ASTPointer<EventDefinition> createEventDefinition(Json::Value const& _node);
+	ASTPointer<ModifierDefinition> createModifierDefinition(Json::Value const& _node);
+	ASTPointer<ModifierInvocation> createModifierInvocation(Json::Value const& _node);
+	ASTPointer<EventDefinition> createEventDefinition(Json::Value const& _node);
 	ASTPointer<ElementaryTypeName> createElementaryTypeName(Json::Value const& _node);
 	ASTPointer<UserDefinedTypeName> createUserDefinedTypeName(Json::Value const& _node);
-//	ASTPointer<FunctionTypeName> createFunctionTypeName(Json::Value const& _node);
+	ASTPointer<FunctionTypeName> createFunctionTypeName(Json::Value const& _node);
 //	ASTPointer<Mapping> createMapping(Json::Value const& _node);
 //	ASTPointer<ArrayTypeName> createArrayTypeName(Json::Value const& _node);
 //	ASTPointer<InlineAssembly> createInlineAssembly(Json::Value const& _node);
-//	ASTPointer<Block> createBlock(Json::Value const& _node);
-//	ASTPointer<PlaceholderStatement> createPlaceholderStatement(Json::Value const& _node);
+	ASTPointer<Block> createBlock(Json::Value const& _node);
+	ASTPointer<PlaceholderStatement> createPlaceholderStatement(Json::Value const& _node);
 //	ASTPointer<IfStatement> createIfStatement(Json::Value const& _node);
 //	ASTPointer<WhileStatement> createWhileStatement(Json::Value const& _node, bool _isDoWhile);
 //	ASTPointer<ForStatement> createForStatement(Json::Value const& _node);
@@ -106,7 +106,7 @@ private:
 //	ASTPointer<IndexAccess> createIndexAccess(Json::Value const& _node);
 	ASTPointer<Identifier> createIdentifier(Json::Value const& _node);
 //	ASTPointer<ElementaryTypeNameExpression> createElementaryTypeNameExpression(Json::Value const& _node);
-//	ASTPointer<ASTNode> createLiteral(Json::Value const& _node);
+	ASTPointer<ASTNode> createLiteral(Json::Value const& _node);
 
 	// =============== helpers ===================
 	// returns the member of a given JSON object, throws if member does not exist
@@ -116,8 +116,7 @@ private:
 	template<class T>
 	ASTPointer<T> nullOrCast(Json::Value _json);
 	ASTPointer<ASTString> nullOrASTString(Json::Value _json, std::string const& _name);
-
-	//	Token::Value literalTokenKind(Json::Value const& _node);
+	Token literalTokenKind(Json::Value const& _node);
 
 	// ============== JSON to definition helpers ===============
 	ASTPointer<ASTString> memberAsASTString(Json::Value const& _node, std::string const& _name);
@@ -126,7 +125,7 @@ private:
 	StateMutability stateMutability(Json::Value const& _node);
 	VariableDeclaration::Location location(Json::Value const& _node);
 	ContractDefinition::ContractKind contractKind(Json::Value const& _node);
-//	Literal::SubDenomination subdenomination(Json::Value const& _node);
+	Literal::SubDenomination subdenomination(Json::Value const& _node);
 
 
 	// =========== member variables ===============

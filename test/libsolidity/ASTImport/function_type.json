@@ -1,0 +1,245 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/function_type.sol:C":
+    {
+      "bin": "608060405234801561001057600080fd5b50610114806100206000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063d6cd497414602d575b600080fd5b608560048036036020811015604157600080fd5b8101908080358060601c9060401c63ffffffff1677ffffffffffffffffffffffffffffffffffffffffffffffff1690916020019190939291909392919050505060ab565b60405180838363ffffffff169060201b1760401b81526020019250505060405180910390f35b600080925092905056fea265627a7a723158208d4e7c71831788f9faa306fc0798684da2a9e0bff6706cdd53f6495c35330c4464736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e33396434663061352e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/function_type.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/function_type.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/function_type.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            17
+          ]
+        },
+        "id": 18,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 17,
+            "linearizedBaseContracts":
+            [
+              17
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "body":
+                {
+                  "id": 15,
+                  "nodeType": "Block",
+                  "src": "128:2:0",
+                  "statements": []
+                },
+                "documentation": null,
+                "id": 16,
+                "implemented": true,
+                "kind": "function",
+                "modifiers": [],
+                "name": "f",
+                "nodeType": "FunctionDefinition",
+                "parameters":
+                {
+                  "id": 7,
+                  "nodeType": "ParameterList",
+                  "parameters":
+                  [
+                    {
+                      "constant": false,
+                      "id": 6,
+                      "name": "x",
+                      "nodeType": "VariableDeclaration",
+                      "scope": 16,
+                      "src": "25:44:0",
+                      "stateVariable": false,
+                      "storageLocation": "default",
+                      "typeDescriptions":
+                      {
+                        "typeIdentifier": "t_function_external_payable$__$returns$_t_uint256_$",
+                        "typeString": "function () payable external returns (uint256)"
+                      },
+                      "typeName":
+                      {
+                        "id": 5,
+                        "nodeType": "FunctionTypeName",
+                        "parameterTypes":
+                        {
+                          "id": 1,
+                          "nodeType": "ParameterList",
+                          "parameters": [],
+                          "src": "33:2:0"
+                        },
+                        "returnParameterTypes":
+                        {
+                          "id": 4,
+                          "nodeType": "ParameterList",
+                          "parameters":
+                          [
+                            {
+                              "constant": false,
+                              "id": 3,
+                              "name": "",
+                              "nodeType": "VariableDeclaration",
+                              "scope": 5,
+                              "src": "62:4:0",
+                              "stateVariable": false,
+                              "storageLocation": "default",
+                              "typeDescriptions":
+                              {
+                                "typeIdentifier": "t_uint256",
+                                "typeString": "uint256"
+                              },
+                              "typeName":
+                              {
+                                "id": 2,
+                                "name": "uint",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "62:4:0",
+                                "typeDescriptions":
+                                {
+                                  "typeIdentifier": "t_uint256",
+                                  "typeString": "uint256"
+                                }
+                              },
+                              "value": null,
+                              "visibility": "internal"
+                            }
+                          ],
+                          "src": "61:6:0"
+                        },
+                        "src": "25:44:0",
+                        "stateMutability": "payable",
+                        "typeDescriptions":
+                        {
+                          "typeIdentifier": "t_function_external_payable$__$returns$_t_uint256_$",
+                          "typeString": "function () payable external returns (uint256)"
+                        },
+                        "visibility": "external"
+                      },
+                      "value": null,
+                      "visibility": "internal"
+                    }
+                  ],
+                  "src": "24:46:0"
+                },
+                "returnParameters":
+                {
+                  "id": 14,
+                  "nodeType": "ParameterList",
+                  "parameters":
+                  [
+                    {
+                      "constant": false,
+                      "id": 13,
+                      "name": "",
+                      "nodeType": "VariableDeclaration",
+                      "scope": 16,
+                      "src": "87:40:0",
+                      "stateVariable": false,
+                      "storageLocation": "default",
+                      "typeDescriptions":
+                      {
+                        "typeIdentifier": "t_function_external_view$__$returns$_t_uint256_$",
+                        "typeString": "function () view external returns (uint256)"
+                      },
+                      "typeName":
+                      {
+                        "id": 12,
+                        "nodeType": "FunctionTypeName",
+                        "parameterTypes":
+                        {
+                          "id": 8,
+                          "nodeType": "ParameterList",
+                          "parameters": [],
+                          "src": "95:2:0"
+                        },
+                        "returnParameterTypes":
+                        {
+                          "id": 11,
+                          "nodeType": "ParameterList",
+                          "parameters":
+                          [
+                            {
+                              "constant": false,
+                              "id": 10,
+                              "name": "",
+                              "nodeType": "VariableDeclaration",
+                              "scope": 12,
+                              "src": "121:4:0",
+                              "stateVariable": false,
+                              "storageLocation": "default",
+                              "typeDescriptions":
+                              {
+                                "typeIdentifier": "t_uint256",
+                                "typeString": "uint256"
+                              },
+                              "typeName":
+                              {
+                                "id": 9,
+                                "name": "uint",
+                                "nodeType": "ElementaryTypeName",
+                                "src": "121:4:0",
+                                "typeDescriptions":
+                                {
+                                  "typeIdentifier": "t_uint256",
+                                  "typeString": "uint256"
+                                }
+                              },
+                              "value": null,
+                              "visibility": "internal"
+                            }
+                          ],
+                          "src": "120:6:0"
+                        },
+                        "src": "87:40:0",
+                        "stateMutability": "view",
+                        "typeDescriptions":
+                        {
+                          "typeIdentifier": "t_function_external_view$__$returns$_t_uint256_$",
+                          "typeString": "function () view external returns (uint256)"
+                        },
+                        "visibility": "external"
+                      },
+                      "value": null,
+                      "visibility": "internal"
+                    }
+                  ],
+                  "src": "86:41:0"
+                },
+                "scope": 17,
+                "src": "13:117:0",
+                "stateMutability": "nonpayable",
+                "superFunction": null,
+                "visibility": "public"
+              }
+            ],
+            "scope": 18,
+            "src": "0:132:0"
+          }
+        ],
+        "src": "0:142:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.39d4f0a5.mod.Linux.g++"
+}
