@@ -112,10 +112,10 @@ private:
 	// returns the member of a given JSON object, throws if member does not exist
 	Json::Value member(Json::Value const& _node, std::string const& _name);
 	// used to parse pragmaDirective
-	Token scanSingleToken(Json::Value _node);
+	Token scanSingleToken(Json::Value const& _node);
 	template<class T>
-	ASTPointer<T> nullOrCast(Json::Value _json);
-	ASTPointer<ASTString> nullOrASTString(Json::Value _json, std::string const& _name);
+	ASTPointer<T> nullOrCast(Json::Value const& _json);
+	ASTPointer<ASTString> nullOrASTString(Json::Value const& _json, std::string const& _name);
 	Token literalTokenKind(Json::Value const& _node);
 
 	// ============== JSON to definition helpers ===============
@@ -126,7 +126,6 @@ private:
 	VariableDeclaration::Location location(Json::Value const& _node);
 	ContractDefinition::ContractKind contractKind(Json::Value const& _node);
 	Literal::SubDenomination subdenomination(Json::Value const& _node);
-
 
 	// =========== member variables ===============
 	// TODO: do i really need all these m_source...?

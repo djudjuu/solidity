@@ -47,7 +47,7 @@ ASTPointer<T> castPointer(ASTPointer<ASTNode> _ast)
 }
 
 template<class T>
-ASTPointer<T> ASTJsonImporter::nullOrCast(Json::Value _json)
+ASTPointer<T> ASTJsonImporter::nullOrCast(Json::Value const& _json)
 {
 	if (_json.isNull())
 		return nullptr;
@@ -728,14 +728,14 @@ Json::Value ASTJsonImporter::member(Json::Value const& _node, string const& _nam
 	return _node[_name];
 }
 
-Token ASTJsonImporter::scanSingleToken(Json::Value _node)
+Token ASTJsonImporter::scanSingleToken(Json::Value const& _node)
 {
 	langutil::Scanner scanner{langutil::CharStream(_node.asString(), "")};
 	astAssert(scanner.peekNextToken() == Token::EOS, "Token string is too long.");
 	return scanner.currentToken();
 }
 
-ASTPointer<ASTString> ASTJsonImporter::nullOrASTString(Json::Value _json, string const& _name){
+ASTPointer<ASTString> ASTJsonImporter::nullOrASTString(Json::Value const& _json, string const& _name){
 	return _json[_name].isString() ? memberAsASTString(_json, _name) : nullptr;
 }
 
