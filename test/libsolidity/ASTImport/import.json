@@ -1,0 +1,340 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/basicContracts.sol:A":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820bc4bb8192c8b1469feb0165052092abf36d746286ab79559fb5e88e74293983464736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/basicContracts.sol:B":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820f926f74ed194c11833ac871cb93c01dd443baffb5f3f6969d7c3f733d7528fd864736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/basicContracts.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820a1e197b49e3f090b37b093f694e83c9a099778f2382c3b12ccaffed5fe5bfbe764736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/basicContracts.sol:D":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820c5e031e2bedbe276a4704863ac723952296c5135d5ed590daae0a590c71f2a7764736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/import.sol:A1":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a72315820795b5da75622398ef58684afdc9285cbe56747fa4eeb73bc726ba3c9e3de827e64736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/import.sol:ABCD":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a7231582049760901cca201a57e6e62f12a82f37c58e1b730a579f66be4a13ca5e0ee143064736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    },
+    "../test/libsolidity/ASTImport/import.sol:B1":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a7231582030847daa5a4100d07be4c35283f82aad01b24d1d4a5dc6f8a7fda38232459e9164736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/basicContracts.sol",
+    "../test/libsolidity/ASTImport/import.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/basicContracts.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/basicContracts.sol",
+        "exportedSymbols":
+        {
+          "A":
+          [
+            14
+          ],
+          "B":
+          [
+            15
+          ],
+          "C":
+          [
+            16
+          ],
+          "D":
+          [
+            17
+          ]
+        },
+        "id": 18,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 14,
+            "linearizedBaseContracts":
+            [
+              14
+            ],
+            "name": "A",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 18,
+            "src": "0:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 15,
+            "linearizedBaseContracts":
+            [
+              15
+            ],
+            "name": "B",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 18,
+            "src": "14:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 16,
+            "linearizedBaseContracts":
+            [
+              16
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 18,
+            "src": "28:13:0"
+          },
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 17,
+            "linearizedBaseContracts":
+            [
+              17
+            ],
+            "name": "D",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 18,
+            "src": "42:13:0"
+          }
+        ],
+        "src": "0:56:0"
+      }
+    },
+    "../test/libsolidity/ASTImport/import.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/import.sol",
+        "exportedSymbols":
+        {
+          "A1":
+          [
+            6
+          ],
+          "ABCD":
+          [
+            12
+          ],
+          "B1":
+          [
+            9
+          ],
+          "base":
+          [
+            3
+          ],
+          "basicContracts":
+          [
+            2
+          ]
+        },
+        "id": 13,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "absolutePath": "../test/libsolidity/ASTImport/basicContracts.sol",
+            "file": "./basicContracts.sol",
+            "id": 1,
+            "nodeType": "ImportDirective",
+            "scope": 13,
+            "sourceUnit": 18,
+            "src": "0:30:1",
+            "symbolAliases": [],
+            "unitAlias": ""
+          },
+          {
+            "absolutePath": "../test/libsolidity/ASTImport/basicContracts.sol",
+            "file": "./basicContracts.sol",
+            "id": 2,
+            "nodeType": "ImportDirective",
+            "scope": 13,
+            "sourceUnit": 18,
+            "src": "31:48:1",
+            "symbolAliases": [],
+            "unitAlias": "basicContracts"
+          },
+          {
+            "absolutePath": "../test/libsolidity/ASTImport/basicContracts.sol",
+            "file": "./basicContracts.sol",
+            "id": 3,
+            "nodeType": "ImportDirective",
+            "scope": 13,
+            "sourceUnit": 18,
+            "src": "80:45:1",
+            "symbolAliases": [],
+            "unitAlias": "base"
+          },
+          {
+            "baseContracts":
+            [
+              {
+                "arguments": null,
+                "baseName":
+                {
+                  "contractScope": null,
+                  "id": 4,
+                  "name": "A",
+                  "nodeType": "UserDefinedTypeName",
+                  "referencedDeclaration": 14,
+                  "src": "354:1:1",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_contract$_A_$14",
+                    "typeString": "contract A"
+                  }
+                },
+                "id": 5,
+                "nodeType": "InheritanceSpecifier",
+                "src": "354:1:1"
+              }
+            ],
+            "contractDependencies":
+            [
+              14
+            ],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 6,
+            "linearizedBaseContracts":
+            [
+              6,
+              14
+            ],
+            "name": "A1",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 13,
+            "src": "339:19:1"
+          },
+          {
+            "baseContracts":
+            [
+              {
+                "arguments": null,
+                "baseName":
+                {
+                  "contractScope": null,
+                  "id": 7,
+                  "name": "basicContracts.B",
+                  "nodeType": "UserDefinedTypeName",
+                  "referencedDeclaration": 15,
+                  "src": "374:16:1",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_contract$_B_$15",
+                    "typeString": "contract B"
+                  }
+                },
+                "id": 8,
+                "nodeType": "InheritanceSpecifier",
+                "src": "374:16:1"
+              }
+            ],
+            "contractDependencies":
+            [
+              15
+            ],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 9,
+            "linearizedBaseContracts":
+            [
+              9,
+              15
+            ],
+            "name": "B1",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 13,
+            "src": "359:34:1"
+          },
+          {
+            "baseContracts":
+            [
+              {
+                "arguments": null,
+                "baseName":
+                {
+                  "contractScope": null,
+                  "id": 10,
+                  "name": "base.A",
+                  "nodeType": "UserDefinedTypeName",
+                  "referencedDeclaration": 14,
+                  "src": "602:6:1",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_contract$_A_$14",
+                    "typeString": "contract A"
+                  }
+                },
+                "id": 11,
+                "nodeType": "InheritanceSpecifier",
+                "src": "602:6:1"
+              }
+            ],
+            "contractDependencies":
+            [
+              14
+            ],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 12,
+            "linearizedBaseContracts":
+            [
+              12,
+              14
+            ],
+            "name": "ABCD",
+            "nodeType": "ContractDefinition",
+            "nodes": [],
+            "scope": 13,
+            "src": "585:26:1"
+          }
+        ],
+        "src": "0:612:1"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.dae51436.mod.Linux.g++"
+}

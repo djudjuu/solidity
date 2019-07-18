@@ -35,7 +35,7 @@ using namespace langutil;
 using namespace dev::solidity;
 using namespace dev::solidity::test;
 using namespace dev::formatting;
-//using namespace dev::test;
+using namespace dev::test;
 using namespace dev;
 using namespace std;
 namespace fs = boost::filesystem;
@@ -86,7 +86,7 @@ ASTImportTest::ASTImportTest(string const& _filename)
 			// dummy
 			string binSansMetadata = "0x00";
 			// why is this not importing correctly? HELP
-			// string binSansMetadata = dev::test::bytecodeSansMetadata((*ast)["contracts"][srcName]["bin"].asString());
+//			 string binSansMetadata = dev::test::bytecodeSansMetadata((*ast)["contracts"][srcName]["bin"].asString());
 			(*ast)["contracts"][srcName]["bin"] = binSansMetadata;
 		}
 	}

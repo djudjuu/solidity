@@ -1,0 +1,78 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/enum_value.sol:C":
+    {
+      "bin": "6080604052348015600f57600080fd5b50606880601d6000396000f3fe6080604052600080fdfea265627a7a7231582066a5c3d3bdaed3aa73582e7a075bab6728fed0c2fcdd68deb954a1cbe059426664736f6c63782c302e352e31312d646576656c6f702e323031392e372e31382b636f6d6d69742e64616535313433362e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/enum_value.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/enum_value.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/enum_value.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            4
+          ]
+        },
+        "id": 5,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 4,
+            "linearizedBaseContracts":
+            [
+              4
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "canonicalName": "C.E",
+                "id": 3,
+                "members":
+                [
+                  {
+                    "id": 1,
+                    "name": "A",
+                    "nodeType": "EnumValue",
+                    "src": "22:1:0"
+                  },
+                  {
+                    "id": 2,
+                    "name": "B",
+                    "nodeType": "EnumValue",
+                    "src": "25:1:0"
+                  }
+                ],
+                "name": "E",
+                "nodeType": "EnumDefinition",
+                "src": "13:15:0"
+              }
+            ],
+            "scope": 5,
+            "src": "0:30:0"
+          }
+        ],
+        "src": "0:31:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.18+commit.dae51436.mod.Linux.g++"
+}
