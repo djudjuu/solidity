@@ -83,10 +83,11 @@ ASTImportTest::ASTImportTest(string const& _filename)
 	{
 		for (auto& srcName: (*ast)["contracts"].getMemberNames())
 		{
+			// why is this not importing correctly? HELP namesspace issues?
+//			string bin = (*ast)["contracts"][srcName]["bin"].asString();
+//			string binSansMetadata = dev::test::bytecodeSansMetadata(bin);
 			// dummy
 			string binSansMetadata = "0x00";
-			// why is this not importing correctly? HELP
-//			 string binSansMetadata = dev::test::bytecodeSansMetadata((*ast)["contracts"][srcName]["bin"].asString());
 			(*ast)["contracts"][srcName]["bin"] = binSansMetadata;
 		}
 	}
@@ -101,7 +102,7 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 	CompilerStack c;
 
 	c.reset(false);
-	// TODO get EVM version from AST
+	// TODO get EVM version from AST -> save evm version in AST?
 	c.setEVMVersion(dev::test::Options::get().evmVersion());
 
 	//import & use the compiler's analyzer to annotate, typecheck, etc...

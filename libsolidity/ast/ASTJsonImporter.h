@@ -1,18 +1,18 @@
 /*
-    This file is part of solidity.
+	This file is part of solidity.
 
-    solidity is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+	solidity is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
 
-    solidity is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	solidity is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with solidity.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with solidity.  If not, see <http://www.gnu.org/licenses/>.
 */
 /**
  * @author julius <djudju@protonmail.com>
@@ -86,23 +86,24 @@ private:
 //	ASTPointer<InlineAssembly> createInlineAssembly(Json::Value const& _node);
 	ASTPointer<Block> createBlock(Json::Value const& _node);
 	ASTPointer<PlaceholderStatement> createPlaceholderStatement(Json::Value const& _node);
-//	ASTPointer<IfStatement> createIfStatement(Json::Value const& _node);
-//	ASTPointer<WhileStatement> createWhileStatement(Json::Value const& _node, bool _isDoWhile);
-//	ASTPointer<ForStatement> createForStatement(Json::Value const& _node);
-//	ASTPointer<Continue> createContinue(Json::Value const& _node);
-//	ASTPointer<Break> createBreak(Json::Value const& _node);
-//	ASTPointer<Return> createReturn(Json::Value const& _node);
-//	ASTPointer<Throw> createThrow(Json::Value const& _node);
+	ASTPointer<IfStatement> createIfStatement(Json::Value const& _node);
+	ASTPointer<WhileStatement> createWhileStatement(Json::Value const& _node, bool _isDoWhile);
+	ASTPointer<ForStatement> createForStatement(Json::Value const& _node);
+	ASTPointer<Continue> createContinue(Json::Value const& _node);
+	ASTPointer<Break> createBreak(Json::Value const& _node);
+	ASTPointer<Return> createReturn(Json::Value const& _node);
+	ASTPointer<Throw> createThrow(Json::Value const& _node);
+	ASTPointer<EmitStatement> createEmitStatement(Json::Value const& _node);
 	ASTPointer<VariableDeclarationStatement> createVariableDeclarationStatement(Json::Value const& _node);
 	ASTPointer<ExpressionStatement> createExpressionStatement(Json::Value const& _node);
-//	ASTPointer<Conditional> createConditional(Json::Value const& _node);
+	ASTPointer<Conditional> createConditional(Json::Value const& _node);
 	ASTPointer<Assignment> createAssignment(Json::Value const& _node);
-//	ASTPointer<TupleExpression> createTupleExpression(Json::Value const& _node);
+	ASTPointer<TupleExpression> createTupleExpression(Json::Value const& _node);
 	ASTPointer<UnaryOperation> createUnaryOperation(Json::Value const& _node);
 	ASTPointer<BinaryOperation> createBinaryOperation(Json::Value const& _node);
 	ASTPointer<FunctionCall> createFunctionCall(Json::Value const& _node);
-//	ASTPointer<NewExpression> createNewExpression(Json::Value const& _node);
-//	ASTPointer<MemberAccess> createMemberAccess(Json::Value const& _node);
+	ASTPointer<NewExpression> createNewExpression(Json::Value const& _node);
+	ASTPointer<MemberAccess> createMemberAccess(Json::Value const& _node);
 	ASTPointer<IndexAccess> createIndexAccess(Json::Value const& _node);
 	ASTPointer<Identifier> createIdentifier(Json::Value const& _node);
 	ASTPointer<ElementaryTypeNameExpression> createElementaryTypeNameExpression(Json::Value const& _node);

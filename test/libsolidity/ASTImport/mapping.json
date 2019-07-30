@@ -1,0 +1,143 @@
+{
+  "contracts":
+  {
+    "../test/libsolidity/ASTImport/mapping.sol:C":
+    {
+      "bin": "608060405234801561001057600080fd5b5061012f806100206000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063bf3b9e3814602d575b600080fd5b606a60048036036060811015604157600080fd5b810190808035906020019092919080359060200190929190803590602001909291905050506084565b604051808215151515815260200191505060405180910390f35b6000602052826000526040600020602052816000526040600020818154811060a857fe5b906000526020600020906020918282040191900692509250509054906101000a900460ff168156fea265627a7a72315820c90e3877d5df7a5f078041de86f5de8fb32dd016c00045e882d8f3664b123fec64736f6c63782c302e352e31312d646576656c6f702e323031392e372e33302b636f6d6d69742e31623061633539382e6d6f64005c"
+    }
+  },
+  "sourceList":
+  [
+    "../test/libsolidity/ASTImport/mapping.sol"
+  ],
+  "sources":
+  {
+    "../test/libsolidity/ASTImport/mapping.sol":
+    {
+      "AST":
+      {
+        "absolutePath": "../test/libsolidity/ASTImport/mapping.sol",
+        "exportedSymbols":
+        {
+          "C":
+          [
+            8
+          ]
+        },
+        "id": 9,
+        "nodeType": "SourceUnit",
+        "nodes":
+        [
+          {
+            "baseContracts": [],
+            "contractDependencies": [],
+            "contractKind": "contract",
+            "documentation": null,
+            "fullyImplemented": true,
+            "id": 8,
+            "linearizedBaseContracts":
+            [
+              8
+            ],
+            "name": "C",
+            "nodeType": "ContractDefinition",
+            "nodes":
+            [
+              {
+                "constant": false,
+                "id": 7,
+                "name": "a",
+                "nodeType": "VariableDeclaration",
+                "scope": 8,
+                "src": "15:51:0",
+                "stateVariable": true,
+                "storageLocation": "default",
+                "typeDescriptions":
+                {
+                  "typeIdentifier": "t_mapping$_t_uint256_$_t_mapping$_t_uint256_$_t_array$_t_bool_$dyn_storage_$_$",
+                  "typeString": "mapping(uint256 => mapping(uint256 => bool[]))"
+                },
+                "typeName":
+                {
+                  "id": 6,
+                  "keyType":
+                  {
+                    "id": 1,
+                    "name": "uint",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "24:4:0",
+                    "typeDescriptions":
+                    {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "nodeType": "Mapping",
+                  "src": "15:42:0",
+                  "typeDescriptions":
+                  {
+                    "typeIdentifier": "t_mapping$_t_uint256_$_t_mapping$_t_uint256_$_t_array$_t_bool_$dyn_storage_$_$",
+                    "typeString": "mapping(uint256 => mapping(uint256 => bool[]))"
+                  },
+                  "valueType":
+                  {
+                    "id": 5,
+                    "keyType":
+                    {
+                      "id": 2,
+                      "name": "uint",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "41:4:0",
+                      "typeDescriptions":
+                      {
+                        "typeIdentifier": "t_uint256",
+                        "typeString": "uint256"
+                      }
+                    },
+                    "nodeType": "Mapping",
+                    "src": "32:24:0",
+                    "typeDescriptions":
+                    {
+                      "typeIdentifier": "t_mapping$_t_uint256_$_t_array$_t_bool_$dyn_storage_$",
+                      "typeString": "mapping(uint256 => bool[])"
+                    },
+                    "valueType":
+                    {
+                      "baseType":
+                      {
+                        "id": 3,
+                        "name": "bool",
+                        "nodeType": "ElementaryTypeName",
+                        "src": "49:4:0",
+                        "typeDescriptions":
+                        {
+                          "typeIdentifier": "t_bool",
+                          "typeString": "bool"
+                        }
+                      },
+                      "id": 4,
+                      "length": null,
+                      "nodeType": "ArrayTypeName",
+                      "src": "49:6:0",
+                      "typeDescriptions":
+                      {
+                        "typeIdentifier": "t_array$_t_bool_$dyn_storage_ptr",
+                        "typeString": "bool[]"
+                      }
+                    }
+                  }
+                },
+                "value": null,
+                "visibility": "public"
+              }
+            ],
+            "scope": 9,
+            "src": "0:69:0"
+          }
+        ],
+        "src": "0:70:0"
+      }
+    }
+  },
+  "version": "0.5.11-develop.2019.7.30+commit.1b0ac598.mod.Linux.g++"
+}

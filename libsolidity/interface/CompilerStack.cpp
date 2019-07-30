@@ -256,7 +256,7 @@ bool CompilerStack::importASTs(map<string, Json::Value const*> const& _sources)
 		return false;
 	m_sourceJsons = _sources;
 	map<string, ASTPointer<SourceUnit>> reconstructedSources = ASTJsonImporter(m_sourceJsons).jsonToSourceUnit();
-	for (auto& src : reconstructedSources)
+	for (auto& src: reconstructedSources)
 	{
 		string const& path = src.first;
 		Source source;
