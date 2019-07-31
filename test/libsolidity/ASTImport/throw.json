@@ -3,7 +3,7 @@
   {
     "../test/libsolidity/ASTImport/throw.sol:C":
     {
-      "bin": "608060405234801561001057600080fd5b50610171806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c8063ebe8e69614610030575b600080fd5b61005c6004803603602081101561004657600080fd5b8101908080359060200190929190505050610076565b604051808215151515815260200191505060405180910390f35b600060078214156100ef576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252601a8152602001807f596f75206d757374204e4f542061736b20666f7220736576656e00000000000081525060200191505060405180910390fd5b604d8214156100fa57fe5b61030982141561010957600080fd5b6001905091905056fea265627a7a723158206cd3fe899487dc84cc72b634ffca68450842abc9dd8653512759735bb1a5f28664736f6c63782c302e352e31312d646576656c6f702e323031392e372e33302b636f6d6d69742e31623061633539382e6d6f64005c"
+      "bin": "6080604052348015600f57600080fd5b5060da8061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063ebe8e69614602d575b600080fd5b605660048036036020811015604157600080fd5b81019080803590602001909291905050506070565b604051808215151515815260200191505060405180910390f35b60006001905091905056fea265627a7a72315820e135fcae9bb93a97619a887206a814a4955ddbd36ec4f373681ec14c83d8881264736f6c63782c302e352e31312d646576656c6f702e323031392e372e33312b636f6d6d69742e38383337336339662e6d6f64005c"
     }
   },
   "sourceList":
@@ -21,10 +21,10 @@
         {
           "C":
           [
-            32
+            11
           ]
         },
-        "id": 33,
+        "id": 12,
         "nodeType": "SourceUnit",
         "nodes":
         [
@@ -34,10 +34,10 @@
             "contractKind": "contract",
             "documentation": null,
             "fullyImplemented": true,
-            "id": 32,
+            "id": 11,
             "linearizedBaseContracts":
             [
-              32
+              11
             ],
             "name": "C",
             "nodeType": "ContractDefinition",
@@ -46,372 +46,24 @@
               {
                 "body":
                 {
-                  "id": 30,
+                  "id": 9,
                   "nodeType": "Block",
-                  "src": "76:126:0",
+                  "src": "76:209:0",
                   "statements":
                   [
                     {
                       "expression":
                       {
                         "argumentTypes": null,
-                        "arguments":
-                        [
-                          {
-                            "argumentTypes": null,
-                            "commonType":
-                            {
-                              "typeIdentifier": "t_uint256",
-                              "typeString": "uint256"
-                            },
-                            "id": 10,
-                            "isConstant": false,
-                            "isLValue": false,
-                            "isPure": false,
-                            "lValueRequested": false,
-                            "leftExpression":
-                            {
-                              "argumentTypes": null,
-                              "id": 8,
-                              "name": "x",
-                              "nodeType": "Identifier",
-                              "overloadedDeclarations": [],
-                              "referencedDeclaration": 2,
-                              "src": "90:1:0",
-                              "typeDescriptions":
-                              {
-                                "typeIdentifier": "t_uint256",
-                                "typeString": "uint256"
-                              }
-                            },
-                            "nodeType": "BinaryOperation",
-                            "operator": "!=",
-                            "rightExpression":
-                            {
-                              "argumentTypes": null,
-                              "hexValue": "37",
-                              "id": 9,
-                              "isConstant": false,
-                              "isLValue": false,
-                              "isPure": true,
-                              "kind": "number",
-                              "lValueRequested": false,
-                              "nodeType": "Literal",
-                              "src": "95:1:0",
-                              "subdenomination": null,
-                              "typeDescriptions":
-                              {
-                                "typeIdentifier": "t_rational_7_by_1",
-                                "typeString": "int_const 7"
-                              },
-                              "value": "7"
-                            },
-                            "src": "90:6:0",
-                            "typeDescriptions":
-                            {
-                              "typeIdentifier": "t_bool",
-                              "typeString": "bool"
-                            }
-                          },
-                          {
-                            "argumentTypes": null,
-                            "hexValue": "596f75206d757374204e4f542061736b20666f7220736576656e",
-                            "id": 11,
-                            "isConstant": false,
-                            "isLValue": false,
-                            "isPure": true,
-                            "kind": "string",
-                            "lValueRequested": false,
-                            "nodeType": "Literal",
-                            "src": "98:28:0",
-                            "subdenomination": null,
-                            "typeDescriptions":
-                            {
-                              "typeIdentifier": "t_stringliteral_ff7bfa42ba19fe6091206611ce1ef5876be49ed079e66564c636d554e381cfea",
-                              "typeString": "literal_string \"You must NOT ask for seven\""
-                            },
-                            "value": "You must NOT ask for seven"
-                          }
-                        ],
-                        "expression":
-                        {
-                          "argumentTypes":
-                          [
-                            {
-                              "typeIdentifier": "t_bool",
-                              "typeString": "bool"
-                            },
-                            {
-                              "typeIdentifier": "t_stringliteral_ff7bfa42ba19fe6091206611ce1ef5876be49ed079e66564c636d554e381cfea",
-                              "typeString": "literal_string \"You must NOT ask for seven\""
-                            }
-                          ],
-                          "id": 7,
-                          "name": "require",
-                          "nodeType": "Identifier",
-                          "overloadedDeclarations":
-                          [
-                            50,
-                            51
-                          ],
-                          "referencedDeclaration": 51,
-                          "src": "82:7:0",
-                          "typeDescriptions":
-                          {
-                            "typeIdentifier": "t_function_require_pure$_t_bool_$_t_string_memory_ptr_$returns$__$",
-                            "typeString": "function (bool,string memory) pure"
-                          }
-                        },
-                        "id": 12,
-                        "isConstant": false,
-                        "isLValue": false,
-                        "isPure": false,
-                        "kind": "functionCall",
-                        "lValueRequested": false,
-                        "names": [],
-                        "nodeType": "FunctionCall",
-                        "src": "82:45:0",
-                        "typeDescriptions":
-                        {
-                          "typeIdentifier": "t_tuple$__$",
-                          "typeString": "tuple()"
-                        }
-                      },
-                      "id": 13,
-                      "nodeType": "ExpressionStatement",
-                      "src": "82:45:0"
-                    },
-                    {
-                      "expression":
-                      {
-                        "argumentTypes": null,
-                        "arguments":
-                        [
-                          {
-                            "argumentTypes": null,
-                            "commonType":
-                            {
-                              "typeIdentifier": "t_uint256",
-                              "typeString": "uint256"
-                            },
-                            "id": 17,
-                            "isConstant": false,
-                            "isLValue": false,
-                            "isPure": false,
-                            "lValueRequested": false,
-                            "leftExpression":
-                            {
-                              "argumentTypes": null,
-                              "id": 15,
-                              "name": "x",
-                              "nodeType": "Identifier",
-                              "overloadedDeclarations": [],
-                              "referencedDeclaration": 2,
-                              "src": "140:1:0",
-                              "typeDescriptions":
-                              {
-                                "typeIdentifier": "t_uint256",
-                                "typeString": "uint256"
-                              }
-                            },
-                            "nodeType": "BinaryOperation",
-                            "operator": "!=",
-                            "rightExpression":
-                            {
-                              "argumentTypes": null,
-                              "hexValue": "3737",
-                              "id": 16,
-                              "isConstant": false,
-                              "isLValue": false,
-                              "isPure": true,
-                              "kind": "number",
-                              "lValueRequested": false,
-                              "nodeType": "Literal",
-                              "src": "145:2:0",
-                              "subdenomination": null,
-                              "typeDescriptions":
-                              {
-                                "typeIdentifier": "t_rational_77_by_1",
-                                "typeString": "int_const 77"
-                              },
-                              "value": "77"
-                            },
-                            "src": "140:7:0",
-                            "typeDescriptions":
-                            {
-                              "typeIdentifier": "t_bool",
-                              "typeString": "bool"
-                            }
-                          }
-                        ],
-                        "expression":
-                        {
-                          "argumentTypes":
-                          [
-                            {
-                              "typeIdentifier": "t_bool",
-                              "typeString": "bool"
-                            }
-                          ],
-                          "id": 14,
-                          "name": "assert",
-                          "nodeType": "Identifier",
-                          "overloadedDeclarations": [],
-                          "referencedDeclaration": 36,
-                          "src": "133:6:0",
-                          "typeDescriptions":
-                          {
-                            "typeIdentifier": "t_function_assert_pure$_t_bool_$returns$__$",
-                            "typeString": "function (bool) pure"
-                          }
-                        },
-                        "id": 18,
-                        "isConstant": false,
-                        "isLValue": false,
-                        "isPure": false,
-                        "kind": "functionCall",
-                        "lValueRequested": false,
-                        "names": [],
-                        "nodeType": "FunctionCall",
-                        "src": "133:15:0",
-                        "typeDescriptions":
-                        {
-                          "typeIdentifier": "t_tuple$__$",
-                          "typeString": "tuple()"
-                        }
-                      },
-                      "id": 19,
-                      "nodeType": "ExpressionStatement",
-                      "src": "133:15:0"
-                    },
-                    {
-                      "condition":
-                      {
-                        "argumentTypes": null,
-                        "commonType":
-                        {
-                          "typeIdentifier": "t_uint256",
-                          "typeString": "uint256"
-                        },
-                        "id": 22,
-                        "isConstant": false,
-                        "isLValue": false,
-                        "isPure": false,
-                        "lValueRequested": false,
-                        "leftExpression":
-                        {
-                          "argumentTypes": null,
-                          "id": 20,
-                          "name": "x",
-                          "nodeType": "Identifier",
-                          "overloadedDeclarations": [],
-                          "referencedDeclaration": 2,
-                          "src": "158:1:0",
-                          "typeDescriptions":
-                          {
-                            "typeIdentifier": "t_uint256",
-                            "typeString": "uint256"
-                          }
-                        },
-                        "nodeType": "BinaryOperation",
-                        "operator": "==",
-                        "rightExpression":
-                        {
-                          "argumentTypes": null,
-                          "hexValue": "373737",
-                          "id": 21,
-                          "isConstant": false,
-                          "isLValue": false,
-                          "isPure": true,
-                          "kind": "number",
-                          "lValueRequested": false,
-                          "nodeType": "Literal",
-                          "src": "163:3:0",
-                          "subdenomination": null,
-                          "typeDescriptions":
-                          {
-                            "typeIdentifier": "t_rational_777_by_1",
-                            "typeString": "int_const 777"
-                          },
-                          "value": "777"
-                        },
-                        "src": "158:8:0",
-                        "typeDescriptions":
-                        {
-                          "typeIdentifier": "t_bool",
-                          "typeString": "bool"
-                        }
-                      },
-                      "falseBody": null,
-                      "id": 27,
-                      "nodeType": "IfStatement",
-                      "src": "154:27:0",
-                      "trueBody":
-                      {
-                        "id": 26,
-                        "nodeType": "Block",
-                        "src": "168:13:0",
-                        "statements":
-                        [
-                          {
-                            "expression":
-                            {
-                              "argumentTypes": null,
-                              "arguments": [],
-                              "expression":
-                              {
-                                "argumentTypes": [],
-                                "id": 23,
-                                "name": "revert",
-                                "nodeType": "Identifier",
-                                "overloadedDeclarations":
-                                [
-                                  52,
-                                  53
-                                ],
-                                "referencedDeclaration": 52,
-                                "src": "170:6:0",
-                                "typeDescriptions":
-                                {
-                                  "typeIdentifier": "t_function_revert_pure$__$returns$__$",
-                                  "typeString": "function () pure"
-                                }
-                              },
-                              "id": 24,
-                              "isConstant": false,
-                              "isLValue": false,
-                              "isPure": false,
-                              "kind": "functionCall",
-                              "lValueRequested": false,
-                              "names": [],
-                              "nodeType": "FunctionCall",
-                              "src": "170:8:0",
-                              "typeDescriptions":
-                              {
-                                "typeIdentifier": "t_tuple$__$",
-                                "typeString": "tuple()"
-                              }
-                            },
-                            "id": 25,
-                            "nodeType": "ExpressionStatement",
-                            "src": "170:8:0"
-                          }
-                        ]
-                      }
-                    },
-                    {
-                      "expression":
-                      {
-                        "argumentTypes": null,
                         "hexValue": "74727565",
-                        "id": 28,
+                        "id": 7,
                         "isConstant": false,
                         "isLValue": false,
                         "isPure": true,
                         "kind": "bool",
                         "lValueRequested": false,
                         "nodeType": "Literal",
-                        "src": "193:4:0",
+                        "src": "276:4:0",
                         "subdenomination": null,
                         "typeDescriptions":
                         {
@@ -421,14 +73,14 @@
                         "value": "true"
                       },
                       "functionReturnParameters": 6,
-                      "id": 29,
+                      "id": 8,
                       "nodeType": "Return",
-                      "src": "186:11:0"
+                      "src": "269:11:0"
                     }
                   ]
                 },
                 "documentation": null,
-                "id": 31,
+                "id": 10,
                 "implemented": true,
                 "kind": "function",
                 "modifiers": [],
@@ -445,7 +97,7 @@
                       "id": 2,
                       "name": "x",
                       "nodeType": "VariableDeclaration",
-                      "scope": 31,
+                      "scope": 10,
                       "src": "42:6:0",
                       "stateVariable": false,
                       "storageLocation": "default",
@@ -483,7 +135,7 @@
                       "id": 5,
                       "name": "",
                       "nodeType": "VariableDeclaration",
-                      "scope": 31,
+                      "scope": 10,
                       "src": "70:4:0",
                       "stateVariable": false,
                       "storageLocation": "default",
@@ -510,20 +162,20 @@
                   ],
                   "src": "69:6:0"
                 },
-                "scope": 32,
-                "src": "15:187:0",
+                "scope": 11,
+                "src": "15:270:0",
                 "stateMutability": "pure",
                 "superFunction": null,
                 "visibility": "public"
               }
             ],
-            "scope": 33,
-            "src": "0:204:0"
+            "scope": 12,
+            "src": "0:287:0"
           }
         ],
-        "src": "0:205:0"
+        "src": "0:288:0"
       }
     }
   },
-  "version": "0.5.11-develop.2019.7.30+commit.1b0ac598.mod.Linux.g++"
+  "version": "0.5.11-develop.2019.7.31+commit.88373c9f.mod.Linux.g++"
 }
