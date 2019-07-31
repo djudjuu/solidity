@@ -41,6 +41,10 @@ bytes bytecodeSansMetadata(bytes const& _bytecode);
 /// Throws exception on invalid hex string.
 std::string bytecodeSansMetadata(std::string const& _bytecode);
 
+/// Returns the bytecode with all metadata hashes (imported contracts too) stripped out.
+/// Throws exception on invalid hex string.
+std::string bytecodeSansAnyMetadata(std::string const& _bytecode);
+
 /// Parse CBOR metadata into a map. Expects the input CBOR to be a
 /// fixed length map, with each key being a string. The values
 /// are parsed as follows:

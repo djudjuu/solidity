@@ -77,17 +77,14 @@ ASTImportTest::ASTImportTest(string const& _filename)
 	}
 
 	// save entire Json from input as string in m_expectations
-	// TODO but modify the metadata to not includes the hash of the solidity-source code
-	// TODO2: byteCodeSansMetadata might need to be modified to remove metadata of imported contracts too
 	if ( (*ast).isMember("contracts") )
 	{
 		for (auto& srcName: (*ast)["contracts"].getMemberNames())
 		{
-			// why is this not importing correctly? HELP namesspace issues?
-//			string bin = (*ast)["contracts"][srcName]["bin"].asString();
-//			string binSansMetadata = dev::test::bytecodeSansMetadata(bin);
-			// dummy
-			string binSansMetadata = "0x00";
+			// TODO somehow this still is an undefined reference, but bytecodeSansMetadata, being in the same file, is not :/
+//			string binSansMetadata = dev::test::bytecodeSansAnyMetadata((*ast)["contracts"][srcName]["bin"].asString());
+			// workaround: apply twice
+			string binSansMetadata = dev::test::bytecodeSansMetadata(dev::test::bytecodeSansMetadata((*ast)["contracts"][srcName]["bin"].asString()));
 			(*ast)["contracts"][srcName]["bin"] = binSansMetadata;
 		}
 	}
@@ -147,7 +144,10 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 		for (string const& contractName: contracts)
 		{
 			Json::Value& contractData = output["contracts"][contractName] = Json::objectValue;
-			string binSansMetadata = "0x00";// dev::test::bytecodeSansMetadata(c.object(contractName).toHex()); // TODO see above
+			// see above in line 84
+//			 string binSansMetadata = dev::test::bytecodeSansAnyMetadata(c.object(contractName).toHex());
+			// workaround:
+			 string binSansMetadata = dev::test::bytecodeSansMetadata(dev::test::bytecodeSansMetadata(c.object(contractName).toHex()));
 			contractData["bin"] = binSansMetadata;
 		}
 	}

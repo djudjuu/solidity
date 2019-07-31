@@ -61,6 +61,16 @@ string bytecodeSansMetadata(string const& _bytecode)
 	return toHex(bytecodeSansMetadata(fromHex(_bytecode, WhenError::Throw)));
 }
 
+string byteCodeSansAnyMetadata(string const& _bytecode)
+{
+	std::string bin = bytecodeSansMetadata(_bytecode);
+	while (onlyMetadata(fromHex(bin, WhenError::Throw)).size() > 0)
+	{
+		bin = bytecodeSansMetadata(bin);
+	}
+	return bin;
+}
+
 DEV_SIMPLE_EXCEPTION(CBORException);
 
 class TinyCBORParser
