@@ -35,7 +35,7 @@ namespace solidity
 {
 
 /**
- * Converter of the AST from JSON format to ASTNode
+ * Component that imports an AST from json format to the internal format
  */
 class ASTJsonImporter
 {
@@ -44,24 +44,29 @@ public:
 
 	/// Create an importer to import a given abstract syntax tree in Json format to an ASTNode
 	/// @a _sourceList used to provide source names for the ASTs
-	ASTJsonImporter(std::map<std::string, Json::Value const*> _sourceList);
+	ASTJsonImporter(std::map<std::string, Json::Value const*> const& _sourceList);
 
-	/// converts the AST from JSON-format to ASTPointer
+	/// Converts the AST from JSON-format to ASTPointer
+	/// @returns map of sourcenames to their respective ASTs
 	std::map<std::string, ASTPointer<SourceUnit>> jsonToSourceUnit();
 
 private:
 
 	// =========== general creation functions ==============
-	// creates the ASTNode Object class by adding the source location and node-ID and forwarding
+
+	/// Sets the source location and nodeID
+	/// @returns the ASTNode Object class of the respective JSON node,
 	template <typename T, typename... Args>
 	ASTPointer<T> createASTNode(Json::Value const& _node, Args&&... _args);
-	// creates the sourceLocation-object from the string in the JSON node
+	/// @returns the sourceLocation-object created from the string in the JSON node
 	langutil::SourceLocation const createSourceLocation(Json::Value const& _node);
-	// function to be called when the type of the Json-node is unknown
-	// will then call the createNodeTypefunction which will call createASTNode<correctType>
+	/// Creates an ASTNode for a given JSON-ast of unknown type
+	/// @returns Pointer to a new created ASTNode
 	ASTPointer<ASTNode> convertJsonToASTNode(Json::Value const& _ast);
 
 	// ============ functions to instantiate the AST-Nodes from Json-Nodes ==============
+	///@{
+	/// Creates a specific ASTNode type given its JSON representation
 	ASTPointer<SourceUnit> createSourceUnit(Json::Value const& _node, std::string const& _srcName);
 	ASTPointer<PragmaDirective> createPragmaDirective(Json::Value const& _node);
 	ASTPointer<ImportDirective> createImportDirective(Json::Value const& _node);
@@ -74,7 +79,6 @@ private:
 	ASTPointer<ParameterList> createParameterList(Json::Value const& _node);
 	ASTPointer<FunctionDefinition> createFunctionDefinition(Json::Value const& _node);
 	ASTPointer<VariableDeclaration> createVariableDeclaration(Json::Value const& _node);
-
 	ASTPointer<ModifierDefinition> createModifierDefinition(Json::Value const& _node);
 	ASTPointer<ModifierInvocation> createModifierInvocation(Json::Value const& _node);
 	ASTPointer<EventDefinition> createEventDefinition(Json::Value const& _node);
@@ -108,33 +112,39 @@ private:
 	ASTPointer<Identifier> createIdentifier(Json::Value const& _node);
 	ASTPointer<ElementaryTypeNameExpression> createElementaryTypeNameExpression(Json::Value const& _node);
 	ASTPointer<ASTNode> createLiteral(Json::Value const& _node);
+	///@}
 
-	// =============== helpers ===================
-	// returns the member of a given JSON object, throws if member does not exist
+	// =============== general helper functions ===================
+	/// @returns the member of a given JSON object, throws if member does not exist
 	Json::Value member(Json::Value const& _node, std::string const& _name);
-	// used to parse pragmaDirective
+	/// @returns the appropriate TokenObject used in parsed Strings (pragma directive or operator)
 	Token scanSingleToken(Json::Value const& _node);
 	template<class T>
+	///@returns nullptr or an ASTPointer cast to a specific Class
 	ASTPointer<T> nullOrCast(Json::Value const& _json);
+	/// @returns nullptr or ASTString, given an JSON string or an empty field
 	ASTPointer<ASTString> nullOrASTString(Json::Value const& _json, std::string const& _name);
-	Token literalTokenKind(Json::Value const& _node);
 
 	// ============== JSON to definition helpers ===============
+	///@{
+	/// helper function to convert a JSON element into the specific datatype used in the AST
 	ASTPointer<ASTString> memberAsASTString(Json::Value const& _node, std::string const& _name);
 	bool memberAsBool(Json::Value const& _node, std::string const& _name);
 	Declaration::Visibility visibility(Json::Value const& _node);
 	StateMutability stateMutability(Json::Value const& _node);
 	VariableDeclaration::Location location(Json::Value const& _node);
 	ContractDefinition::ContractKind contractKind(Json::Value const& _node);
+	Token literalTokenKind(Json::Value const& _node);
 	Literal::SubDenomination subdenomination(Json::Value const& _node);
+	///@}
 
 	// =========== member variables ===============
 	// TODO: do i really need all these m_source...?
-	// path to file -> file with AST in JSON format
+	/// Stores filepath as sourcenames to AST in JSON format
 	std::map<std::string, Json::Value const*> m_sourceList;
-	// list of path to files (used as names)
+	/// list of filepaths (used as sourcenames)
 	std::vector<std::shared_ptr<std::string const>> m_sourceLocations;
-	// path to file -> AST
+	/// filepath to AST
 	std::map<std::string, ASTPointer<SourceUnit>> m_sourceUnits;
 	std::string m_currentSourceName;
 };

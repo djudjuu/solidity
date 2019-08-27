@@ -990,8 +990,8 @@ bool CommandLineInterface::processInput()
 			m_compiler->setRemappings(m_remappings);
 		if (m_args.count(g_argImportAst))
 		{
-			map<string, Json::Value const*> sourceJsons = parseAstFromInput();
 			//feed AST to compiler
+			map<string, Json::Value const*> sourceJsons = parseAstFromInput();
 			m_compiler->reset(false);
 			//use the compiler's analyzer to annotate, typecheck, etc...
 			if (!m_compiler->importASTs(sourceJsons))

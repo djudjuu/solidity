@@ -17,7 +17,7 @@
 /**
  * @author julius <djudju@protonmail.com>
  * @date 2019
- *  Converts the AST from JSON format to ASTNode
+ *Component that imports an AST from json format to the internal format
  */
 
 #include <libsolidity/ast/ASTJsonImporter.h>
@@ -59,8 +59,8 @@ ASTPointer<T> ASTJsonImporter::nullOrCast(Json::Value const& _json)
 
 // ============ public ===========================
 
-ASTJsonImporter::ASTJsonImporter(map<string, Json::Value const*> _sourceList )
-		: m_sourceList(_sourceList)
+ASTJsonImporter::ASTJsonImporter(map<string, Json::Value const*> const& _sourceList ):
+		m_sourceList(_sourceList)
 {
 	for (auto const& src: _sourceList)
 		m_sourceLocations.emplace_back(make_shared<string const>(src.first));
@@ -228,7 +228,8 @@ ASTPointer<PragmaDirective> ASTJsonImporter::createPragmaDirective(Json::Value c
 	return createASTNode<PragmaDirective>(_node, tokens, literals);
 }
 
-ASTPointer<ImportDirective> ASTJsonImporter::createImportDirective(Json::Value const& _node){
+ASTPointer<ImportDirective> ASTJsonImporter::createImportDirective(Json::Value const& _node)
+{
 	ASTPointer<ASTString> unitAlias = memberAsASTString(_node, "unitAlias");
 	ASTPointer<ASTString> path = memberAsASTString(_node, "file");
 	vector<pair<ASTPointer<Identifier>, ASTPointer<ASTString>>> symbolAliases;
@@ -249,7 +250,8 @@ ASTPointer<ImportDirective> ASTJsonImporter::createImportDirective(Json::Value c
 	return tmp;
 }
 
-ASTPointer<ContractDefinition> ASTJsonImporter::createContractDefinition(Json::Value const& _node){
+ASTPointer<ContractDefinition> ASTJsonImporter::createContractDefinition(Json::Value const& _node)
+{
 	std::vector<ASTPointer<InheritanceSpecifier>> baseContracts;
 	for (auto& base: _node["baseContracts"])
 		baseContracts.push_back(createInheritanceSpecifier(base));
@@ -556,7 +558,8 @@ ASTPointer<Break> ASTJsonImporter::createBreak(Json::Value const&  _node)
 	);
 }
 
-ASTPointer<Return> ASTJsonImporter::createReturn(Json::Value const&  _node) {
+ASTPointer<Return> ASTJsonImporter::createReturn(Json::Value const&  _node)
+{
 	return createASTNode<Return>(
 		_node,
 		nullOrASTString(_node, "documentation"),
@@ -730,9 +733,6 @@ ASTPointer<ASTNode> ASTJsonImporter::createLiteral(Json::Value const&  _node)
 	);
 }
 
-
-
-
 // ===== helper functions ==========
 
 Json::Value ASTJsonImporter::member(Json::Value const& _node, string const& _name)
@@ -767,7 +767,8 @@ bool ASTJsonImporter::memberAsBool(Json::Value const& _node, string const& _name
 }
 
 
-// =========== definitions =======================
+// =========== JSON to defintion helpers =======================
+
 ContractDefinition::ContractKind ASTJsonImporter::contractKind(Json::Value const& _node)
 {
 	ContractDefinition::ContractKind kind;
