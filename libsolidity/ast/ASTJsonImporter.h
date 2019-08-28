@@ -34,21 +34,19 @@ namespace dev
 namespace solidity
 {
 
+using SourceLocation = langutil::SourceLocation;
+
 /**
  * Component that imports an AST from json format to the internal format
  */
 class ASTJsonImporter
 {
 public:
-	using SourceLocation = langutil::SourceLocation;
-
-	/// Create an importer to import a given abstract syntax tree in Json format to an ASTNode
-	/// @a _sourceList used to provide source names for the ASTs
-	ASTJsonImporter(std::map<std::string, Json::Value const*> const& _sourceList);
 
 	/// Converts the AST from JSON-format to ASTPointer
+	/// @a _sourceList used to provide source names for the ASTs
 	/// @returns map of sourcenames to their respective ASTs
-	std::map<std::string, ASTPointer<SourceUnit>> jsonToSourceUnit();
+	std::map<std::string, ASTPointer<SourceUnit>> jsonToSourceUnit(std::map<std::string, Json::Value const*> const& _sourceList);
 
 private:
 
@@ -63,6 +61,11 @@ private:
 	/// Creates an ASTNode for a given JSON-ast of unknown type
 	/// @returns Pointer to a new created ASTNode
 	ASTPointer<ASTNode> convertJsonToASTNode(Json::Value const& _ast);
+	/// @returns a pointer to the more specific subclass of ASTNode
+	/// as indicated by the nodeType field of the json
+	template<class T>
+	ASTPointer<T> convertJsonToASTNode(Json::Value const& _node);
+
 
 	// ============ functions to instantiate the AST-Nodes from Json-Nodes ==============
 	///@{
