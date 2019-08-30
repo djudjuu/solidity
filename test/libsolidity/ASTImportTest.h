@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <libsolidity/interface/CompilerStack.h>
 
 #include <libdevcore/JSON.h>
 
@@ -46,15 +47,14 @@ public:
 	void printSource(std::ostream& _stream, std::string const& _linePrefix = "", bool const _formatted = false) const override;
 	void printUpdatedExpectations(std::ostream& _stream, std::string const& _linePrefix) const override;
 private:
-	// sourceName->AST how it needs to be given to the compiler
-	std::map<std::string, Json::Value const*> m_sourceJsons;
-	// used to tell the ASTJsonConverter how to index the sources
-	std::map<std::string, unsigned> m_sourceIndices;
+	Json::Value combineOutputsInJSON(CompilerStack * _c);
+
+	// <sourceName, sourceCode>
+	std::map<std::string, std::string> m_sources;
+	Json::Value	m_expectationJSON;
 	std::string m_expectation;
-	std::string m_astFilename;
 	std::string m_result;
-	// workaround
-	std::string m_version;
+
 };
 
 }

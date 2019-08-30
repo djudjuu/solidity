@@ -43,67 +43,88 @@ using namespace boost::unit_test;
 
 ASTImportTest::ASTImportTest(string const& _filename)
 {
-	// TODO figure out where this is given a .sol file as input and change it to be the JSON
+	// 1) load .sol file into compiler
+
 	if (!boost::algorithm::ends_with(_filename, ".sol"))
 		BOOST_THROW_EXCEPTION(runtime_error("Invalid test contract file name: \"" + _filename + "\"."));
 
-	// use .json as input file for the test
-	m_astFilename = _filename.substr(0, _filename.size() - 4) + ".json";
+	ifstream file(_filename);
+	if (!file)
+		BOOST_THROW_EXCEPTION(runtime_error("Cannot open test contract: \"" + _filename + "\"."));
+	file.exceptions(ios::badbit);
 
-	// try parsing as json
-	Json::Value* ast = new Json::Value();
-	// meanwhile set sourceIndices map so that ASTJsonConverter knows which index to give in SourceLocations
-	size_t i = 0;
-	if (jsonParseFile(m_astFilename, *ast))
+	// ========== my version START =========
+	// TODO understand what this is doing exactly
+	string sourceName;
+	string source;
+	string line;
+	string const sourceDelimiter("// ---- SOURCE: ");
+	string const delimiter("// ----");
+
+	while (getline(file, line))
 	{
-		if ((*ast).isMember("sourceList") && (*ast).isMember("sources"))
+		if (boost::algorithm::starts_with(line, sourceDelimiter))
 		{
-			for (auto& src: (*ast)["sourceList"])
-			{
-				astAssert( (*ast)["sources"][src.asString()]["AST"]["nodeType"].asString() == "SourceUnit",  "Top-level node should be a 'SourceUnit'");
-				m_sourceJsons[src.asString()] = &((*ast)["sources"][src.asString()]["AST"]);
-				m_sourceIndices[src.asString()] = i;
-				i++;
-			}
+			if (!sourceName.empty())
+				m_sources[sourceName] = source;
+			sourceName = line.substr(sourceDelimiter.size(), string::npos);
+			source = string();
 		}
-		else
-		{
-			BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("should have been option A")); //TODO make this helpful
-		}
+		else if (!line.empty() && !boost::algorithm::starts_with(line, delimiter))
+			source += line + "\n";
+	}
+
+	m_sources[sourceName.empty() ? "a" : sourceName] = source;
+	// ==== my version END ===========
+
+	file.close();
+
+	CompilerStack c;
+	c.setSources(m_sources);
+
+	// 2) parse, analyze, compile()
+
+	c.setEVMVersion(dev::test::Options::get().evmVersion());
+	if (c.parse()) {
+		c.analyze();
 	}
 	else
 	{
-		BOOST_THROW_EXCEPTION(InvalidAstError() << errinfo_comment("Input file could not be parsed to JSON"));
+		cout << "ERRORRRR" << endl;
+		BOOST_THROW_EXCEPTION(runtime_error("Cannot parse and analyze test contract: \"" + _filename + "\"."));
+		// TODO output compiler errors c.errors()
+		//		SourceReferenceFormatterHuman formatter(_stream, _formatted);
+		//		for (auto const& error: c.errors())
+		//			formatter.printErrorInformation(*error);
 	}
+	if (!c.compile())
+		BOOST_THROW_EXCEPTION(runtime_error("Could not compile test contract: \"" + _filename + "\"."));
 
-	// save entire Json from input as string in m_expectations
-	if ( (*ast).isMember("contracts") )
-	{
-		for (auto& srcName: (*ast)["contracts"].getMemberNames())
-		{
-			// TODO somehow this still is an undefined reference, but bytecodeSansMetadata, being in the same file, is not :/
-//			string binSansMetadata = dev::test::bytecodeSansAnyMetadata((*ast)["contracts"][srcName]["bin"].asString());
-			// workaround: apply twice
-			string binSansMetadata = dev::test::bytecodeSansMetadata(dev::test::bytecodeSansMetadata((*ast)["contracts"][srcName]["bin"].asString()));
-			(*ast)["contracts"][srcName]["bin"] = binSansMetadata;
-		}
-	}
-	m_expectation = dev::jsonPrettyPrint(*ast);
+	// 3) export AST & binary into m_expectations, such that it can
+	// be compared
+	// printed
+	// imported into the compiler again
 
-	// Workaround: save versionString to manually paste it into result
-	m_version = (*ast)["version"].asString();
+	m_expectationJSON = combineOutputsInJSON(&c);
+	m_expectation = dev::jsonPrettyPrint(m_expectationJSON);
+//	cout << "expected is saved as" << m_expectation << endl;
 }
 
 TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePrefix, bool const _formatted)
 {
+	// 4) load ast from expectations into reset compiler
 	CompilerStack c;
+	c.reset(true); // keep settings
 
-	c.reset(false);
-	// TODO get EVM version from AST -> save evm version in AST?
-	c.setEVMVersion(dev::test::Options::get().evmVersion());
+	// create input for ast-import function from m_expectations
+	map<string, Json::Value const*> c_import_input;
+	for (auto const& source: m_sources)
+	{
+		c_import_input[source.first] = &m_expectationJSON["sources"][source.first]["AST"];
+	}
 
 	//import & use the compiler's analyzer to annotate, typecheck, etc...
-	if (!c.importASTs(m_sourceJsons))
+	if (!c.importASTs(c_import_input))
 	{
 		// is this the correct way to report an error here?
 		astAssert(false, "Import of the AST failed");
@@ -116,51 +137,16 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 			formatter.printErrorInformation(*error);
 		return TestResult::FatalError;
 	}
-	if (!c.compile()) // those last two ifs can be combined into one
+	if (!c.compile())
 	{
 		SourceReferenceFormatterHuman formatter(_stream, _formatted);
 		for (auto const& error: c.errors())
 			formatter.printErrorInformation(*error);
 		return TestResult::FatalError;
 	}
-
-	// export analyzed AST again as result
-	// similar to how its done when creating combined json in CommandLineInterface's handleCombinedJson()
-	Json::Value output(Json::objectValue);
-
-	// TODO use the version from the input JSON
-	output["version"] = m_version; //dev::solidity::VersionString;
-
-	// sourceList info
-	output["sourceList"] = Json::Value(Json::arrayValue);
-	for (auto const& source: c.sourceNames())
-		output["sourceList"].append(source);
-
-	// handle contracts-object (binary, metadata...)
-	vector<string> contracts = c.contractNames();
-	if (!contracts.empty())
-	{
-		output["contracts"] = Json::Value(Json::objectValue);
-		for (string const& contractName: contracts)
-		{
-			Json::Value& contractData = output["contracts"][contractName] = Json::objectValue;
-			// see above in line 84
-//			 string binSansMetadata = dev::test::bytecodeSansAnyMetadata(c.object(contractName).toHex());
-			// workaround:
-			 string binSansMetadata = dev::test::bytecodeSansMetadata(dev::test::bytecodeSansMetadata(c.object(contractName).toHex()));
-			contractData["bin"] = binSansMetadata;
-		}
-	}
-	output["sources"] = Json::Value(Json::objectValue);
-	for (auto const& sourceCode: m_sourceJsons)
-	{
-		ASTJsonConverter converter(false, c.sourceIndices());
-		output["sources"][sourceCode.first] = Json::Value(Json::objectValue);
-		output["sources"][sourceCode.first]["AST"] = converter.toJson(c.ast(sourceCode.first));
-	}
-
-	// save as result
-	m_result = dev::jsonPrettyPrint(output);
+	// export output again, but into m_results
+	m_result = dev::jsonPrettyPrint(combineOutputsInJSON(&c));
+//	 cout << "result is " << m_result << endl;
 
 	// compare & error reporting
 	bool resultsMatch = true;
@@ -189,6 +175,45 @@ TestCase::TestResult ASTImportTest::run(ostream& _stream, string const& _linePre
 
 	return resultsMatch ? TestResult::Success : TestResult::Failure;
 }
+
+Json::Value ASTImportTest::combineOutputsInJSON(CompilerStack* _c)
+{
+	Json::Value output(Json::objectValue);
+
+	vector<string> contracts = _c->contractNames();
+	if (!contracts.empty())
+	{
+		// holds as many entries as there are contracts in all combined sourcefiles
+		output["contracts"] = Json::Value(Json::objectValue);
+		for (string const& contractName: contracts)
+		{
+			Json::Value& contractData = output["contracts"][contractName] = Json::objectValue;
+//			string binSans = dev::test::bytecodeSansMetadata(_c->object(contractName).toHex());
+//			contractData["bin"] = "";//binSans; //TODO
+			// see above in line 84
+//			 string binSansMetadata = dev::test::bytecodeSansAnyMetadata(c.object(contractName).toHex());
+			// workaround:
+			 string binSansMetadata = dev::test::bytecodeSansMetadata(dev::test::bytecodeSansMetadata(_c->object(contractName).toHex()));
+			contractData["bin"] = binSansMetadata;
+		}
+	}
+	// keep around, maybe this will be useful to resolve why the importing files break....
+	// list of filepaths that hold all included contracts
+	//	output["sourceList"] = Json::Value(Json::arrayValue);
+	//	for (auto const& source: c.sourceNames())
+	//	output["sourceList"].append(source);
+
+	//to hold the ASTs, (as many as there are actual sourcefiles)
+	output["sources"] = Json::Value(Json::objectValue);
+	for (auto const& source: m_sources)
+	{
+		ASTJsonConverter converter(false, _c->sourceIndices());
+		output["sources"][source.first] = Json::Value(Json::objectValue);
+		output["sources"][source.first]["AST"] = converter.toJson(_c->ast(source.first));
+	}
+	return output;
+}
+
 
 void ASTImportTest::printSource(ostream& _stream, string const& _linePrefix, bool const) const
 {
