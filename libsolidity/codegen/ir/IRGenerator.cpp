@@ -32,17 +32,21 @@
 #include <libyul/AssemblyStack.h>
 #include <libyul/Utilities.h>
 
-#include <libdevcore/CommonData.h>
-#include <libdevcore/Whiskers.h>
-#include <libdevcore/StringUtils.h>
+#include <libsolutil/CommonData.h>
+#include <libsolutil/Whiskers.h>
+#include <libsolutil/StringUtils.h>
 
 #include <liblangutil/SourceReferenceFormatter.h>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/range/adaptor/reversed.hpp>
+
+#include <sstream>
 
 using namespace std;
-using namespace dev;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::frontend;
 
 pair<string, string> IRGenerator::run(ContractDefinition const& _contract)
 {
@@ -129,10 +133,7 @@ string IRGenerator::generateFunction(FunctionDefinition const& _function)
 	return m_context.functionCollector()->createFunction(functionName, [&]() {
 		Whiskers t(R"(
 			function <functionName>(<params>) <returns> {
-				for { let return_flag := 1 } return_flag {} {
-					<body>
-					break
-				}
+				<body>
 			}
 		)");
 		t("functionName", functionName);
@@ -149,21 +150,73 @@ string IRGenerator::generateFunction(FunctionDefinition const& _function)
 	});
 }
 
+string IRGenerator::generateGetter(VariableDeclaration const& _varDecl)
+{
+	string functionName = m_context.functionName(_varDecl);
+
+	Type const* type = _varDecl.annotation().type;
+
+	solAssert(!_varDecl.isConstant(), "");
+	solAssert(_varDecl.isStateVariable(), "");
+
+	solUnimplementedAssert(type->isValueType(), "");
+
+	return m_context.functionCollector()->createFunction(functionName, [&]() {
+		pair<u256, unsigned> slot_offset = m_context.storageLocationOfVariable(_varDecl);
+
+		return Whiskers(R"(
+			function <functionName>() -> rval {
+				rval := <readStorage>(<slot>)
+			}
+		)")
+		("functionName", functionName)
+		("readStorage", m_utils.readFromStorage(*type, slot_offset.second, false))
+		("slot", slot_offset.first.str())
+		.render();
+	});
+}
+
 string IRGenerator::constructorCode(ContractDefinition const& _contract)
 {
-	// TODO initialize state variables in base to derived order.
-	// TODO base constructors
-	// TODO callValueCheck if there is no constructor.
-	if (FunctionDefinition const* constructor = _contract.constructor())
+	// Initialization of state variables in base-to-derived order.
+	solAssert(!_contract.isLibrary(), "Tried to initialize state variables of library.");
+
+	using boost::adaptors::reverse;
+
+	ostringstream out;
+
+	FunctionDefinition const* constructor = _contract.constructor();
+	if (constructor && !constructor->isPayable())
+		out << callValueCheck();
+
+	for (ContractDefinition const* contract: reverse(_contract.annotation().linearizedBaseContracts))
 	{
-		string out;
-		if (!constructor->isPayable())
-			out = callValueCheck();
-		solUnimplementedAssert(constructor->parameters().empty(), "");
-		return move(out) + m_context.functionName(*constructor) + "()\n";
+		out <<
+			"\n// Begin state variable initialization for contract \"" <<
+			contract->name() <<
+			"\" (" <<
+			contract->stateVariables().size() <<
+			" variables)\n";
+
+		IRGeneratorForStatements generator{m_context, m_utils};
+		for (VariableDeclaration const* variable: contract->stateVariables())
+			if (!variable->isConstant())
+				generator.initializeStateVar(*variable);
+		out << generator.code();
+
+		out << "// End state variable initialization for contract \"" << contract->name() << "\".\n";
 	}
 
-	return {};
+	if (constructor)
+	{
+		solUnimplementedAssert(constructor->parameters().empty(), "");
+
+		// TODO base constructors
+
+		out << m_context.functionName(*constructor) + "()\n";
+	}
+
+	return out.str();
 }
 
 string IRGenerator::deployCode(ContractDefinition const& _contract)
@@ -212,6 +265,7 @@ string IRGenerator::dispatchRoutine(ContractDefinition const& _contract)
 			</cases>
 			default {}
 		}
+		if iszero(calldatasize()) { <receiveEther> }
 		<fallback>
 	)X");
 	t("shr224", m_utils.shiftRightFunction(224));
@@ -227,14 +281,21 @@ string IRGenerator::dispatchRoutine(ContractDefinition const& _contract)
 
 		unsigned paramVars = make_shared<TupleType>(type->parameterTypes())->sizeOnStack();
 		unsigned retVars = make_shared<TupleType>(type->returnParameterTypes())->sizeOnStack();
-		templ["assignToParams"] = paramVars == 0 ? "" : "let " + m_utils.suffixedVariableNameList("param_", 0, paramVars) + " := ";
-		templ["assignToRetParams"] = retVars == 0 ? "" : "let " + m_utils.suffixedVariableNameList("ret_", 0, retVars) + " := ";
+		templ["assignToParams"] = paramVars == 0 ? "" : "let " + suffixedVariableNameList("param_", 0, paramVars) + " := ";
+		templ["assignToRetParams"] = retVars == 0 ? "" : "let " + suffixedVariableNameList("ret_", 0, retVars) + " := ";
 
 		ABIFunctions abiFunctions(m_evmVersion, m_context.functionCollector());
 		templ["abiDecode"] = abiFunctions.tupleDecoder(type->parameterTypes());
-		templ["params"] = m_utils.suffixedVariableNameList("param_", 0, paramVars);
-		templ["retParams"] = m_utils.suffixedVariableNameList("ret_", retVars, 0);
-		templ["function"] = generateFunction(dynamic_cast<FunctionDefinition const&>(type->declaration()));
+		templ["params"] = suffixedVariableNameList("param_", 0, paramVars);
+		templ["retParams"] = suffixedVariableNameList("ret_", retVars, 0);
+
+		if (FunctionDefinition const* funDef = dynamic_cast<FunctionDefinition const*>(&type->declaration()))
+			templ["function"] = generateFunction(*funDef);
+		else if (VariableDeclaration const* varDecl = dynamic_cast<VariableDeclaration const*>(&type->declaration()))
+			templ["function"] = generateGetter(*varDecl);
+		else
+			solAssert(false, "Unexpected declaration for function!");
+
 		templ["allocate"] = m_utils.allocationFunction();
 		templ["abiEncode"] = abiFunctions.tupleEncoder(type->returnParameterTypes(), type->returnParameterTypes(), false);
 		templ["comma"] = retVars == 0 ? "" : ", ";
@@ -251,6 +312,10 @@ string IRGenerator::dispatchRoutine(ContractDefinition const& _contract)
 	}
 	else
 		t("fallback", "revert(0, 0)");
+	if (FunctionDefinition const* etherReceiver = _contract.receiveFunction())
+		t("receiveEther", generateFunction(*etherReceiver) + "() stop()");
+	else
+		t("receiveEther", "");
 	return t.render();
 }
 

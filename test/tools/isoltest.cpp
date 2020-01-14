@@ -15,13 +15,14 @@
 	along with solidity.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libdevcore/CommonIO.h>
-#include <libdevcore/AnsiColorized.h>
+#include <libsolutil/CommonIO.h>
+#include <libsolutil/AnsiColorized.h>
 
 #include <test/Common.h>
 #include <test/tools/IsolTestOptions.h>
 #include <test/libsolidity/AnalysisFramework.h>
 #include <test/InteractiveTests.h>
+#include <test/EVMHost.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -38,16 +39,18 @@
 #include <windows.h>
 #endif
 
-using namespace dev;
-using namespace dev::solidity;
-using namespace dev::solidity::test;
-using namespace dev::formatting;
 using namespace std;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::frontend;
+using namespace solidity::frontend::test;
+using namespace solidity::util::formatting;
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
 using TestCreator = TestCase::TestCaseCreator;
-using TestOptions = dev::test::IsolTestOptions;
+using TestOptions = solidity::test::IsolTestOptions;
 
 struct TestStats
 {
@@ -156,7 +159,7 @@ TestTool::Result TestTool::process()
 		{
 			(AnsiColorized(cout, formatted, {BOLD}) << m_name << ": ").flush();
 
-			m_test = m_testCaseCreator(TestCase::Config{m_path.string(), m_options.ipcPath.string(), m_options.evmVersion()});
+			m_test = m_testCaseCreator(TestCase::Config{m_path.string(), m_options.evmVersion()});
 			if (m_test->validateSettings(m_options.evmVersion()))
 				switch (TestCase::TestResult result = m_test->run(outputMessages, "  ", formatted))
 				{
@@ -286,7 +289,7 @@ TestStats TestTool::processPath(
 				_testCaseCreator,
 				_options,
 				fullpath,
-				currentPath.string()
+				currentPath.generic_path().string()
 			);
 			auto result = testTool.process();
 
@@ -349,7 +352,7 @@ void setupTerminal()
 #endif
 }
 
-boost::optional<TestStats> runTestSuite(
+std::optional<TestStats> runTestSuite(
 	TestCreator _testCaseCreator,
 	TestOptions const& _options,
 	fs::path const& _basePath,
@@ -363,7 +366,7 @@ boost::optional<TestStats> runTestSuite(
 	if (!fs::exists(testPath) || !fs::is_directory(testPath))
 	{
 		cerr << _name << " tests not found. Use the --testpath argument." << endl;
-		return {};
+		return std::nullopt;
 	}
 
 	TestStats stats = TestTool::processPath(
@@ -398,7 +401,7 @@ int main(int argc, char const *argv[])
 {
 	setupTerminal();
 
-	dev::test::IsolTestOptions options(&TestTool::editor);
+	solidity::test::IsolTestOptions options(&TestTool::editor);
 
 	try
 	{
@@ -413,6 +416,15 @@ int main(int argc, char const *argv[])
 		return 1;
 	}
 
+	bool disableSemantics = !solidity::test::EVMHost::getVM(options.evmonePath.string());
+	if (disableSemantics)
+	{
+		cout << "Unable to find " << solidity::test::evmoneFilename << ". Please provide the path using --evmonepath <path>." << endl;
+		cout << "You can download it at" << endl;
+		cout << solidity::test::evmoneDownloadLink << endl;
+		cout << endl << "--- SKIPPING ALL SEMANTICS TESTS ---" << endl << endl;
+	}
+
 	TestStats global_stats{0, 0};
 	cout << "Running tests..." << endl << endl;
 
@@ -420,7 +432,7 @@ int main(int argc, char const *argv[])
 	// Interactive tests are added in InteractiveTests.h
 	for (auto const& ts: g_interactiveTestsuites)
 	{
-		if (ts.ipc && options.disableIPC)
+		if (ts.needsVM && disableSemantics)
 			continue;
 
 		if (ts.smt && options.disableSMT)
@@ -450,6 +462,9 @@ int main(int argc, char const *argv[])
 		cout << " tests skipped)";
 	}
 	cout << "." << endl;
+
+	if (disableSemantics)
+		cout << "\nNOTE: Skipped semantics tests because " << solidity::test::evmoneFilename << " could not be found.\n" << endl;
 
 	return global_stats ? 0 : 1;
 }

@@ -19,16 +19,13 @@
  * Metadata processing helpers.
  */
 
-#include <libdevcore/CommonData.h>
-
-#include <boost/optional.hpp>
+#include <libsolutil/CommonData.h>
 
 #include <map>
+#include <optional>
 #include <string>
 
-namespace dev
-{
-namespace test
+namespace solidity::test
 {
 
 /// Returns only the CBOR metadata.
@@ -48,11 +45,10 @@ std::string bytecodeSansMetadata(std::string const& _bytecode);
 /// - bytes into hex strings
 /// - booleans into "true"/"false" strings
 /// - everything else is invalid
-boost::optional<std::map<std::string, std::string>> parseCBORMetadata(bytes const& _metadata);
+std::optional<std::map<std::string, std::string>> parseCBORMetadata(bytes const& _metadata);
 
 /// Expects a serialised metadata JSON and returns true if the
 /// content is valid metadata.
 bool isValidMetadata(std::string const& _metadata);
 
-}
 } // end namespaces

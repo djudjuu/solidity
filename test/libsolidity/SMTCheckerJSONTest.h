@@ -19,25 +19,21 @@
 
 #include <test/libsolidity/SyntaxTest.h>
 
-#include <libdevcore/JSON.h>
+#include <libsolutil/JSON.h>
 
 #include <string>
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
-class SMTCheckerTest: public SyntaxTest
+class SMTCheckerJSONTest: public SyntaxTest
 {
 public:
 	static std::unique_ptr<TestCase> create(Config const& _config)
 	{
-		return std::make_unique<SMTCheckerTest>(_config.filename, _config.evmVersion);
+		return std::make_unique<SMTCheckerJSONTest>(_config.filename, _config.evmVersion);
 	}
-	SMTCheckerTest(std::string const& _filename, langutil::EVMVersion _evmVersion);
+	SMTCheckerJSONTest(std::string const& _filename, langutil::EVMVersion _evmVersion);
 
 	TestResult run(std::ostream& _stream, std::string const& _linePrefix = "", bool _formatted = false) override;
 
@@ -48,6 +44,4 @@ private:
 	Json::Value m_smtResponses;
 };
 
-}
-}
 }

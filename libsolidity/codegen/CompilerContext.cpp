@@ -34,6 +34,7 @@
 #include <libyul/backends/evm/EVMDialect.h>
 #include <libyul/backends/evm/EVMMetrics.h>
 #include <libyul/optimiser/Suite.h>
+#include <libyul/Object.h>
 #include <libyul/YulString.h>
 
 #include <liblangutil/ErrorReporter.h>
@@ -53,10 +54,10 @@
 
 
 using namespace std;
-using namespace langutil;
-using namespace dev::eth;
-using namespace dev;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::evmasm;
+using namespace solidity::frontend;
+using namespace solidity::langutil;
 
 void CompilerContext::addStateVariable(
 	VariableDeclaration const& _declaration,
@@ -80,17 +81,17 @@ void CompilerContext::callLowLevelFunction(
 	function<void(CompilerContext&)> const& _generator
 )
 {
-	eth::AssemblyItem retTag = pushNewTag();
+	evmasm::AssemblyItem retTag = pushNewTag();
 	CompilerUtils(*this).moveIntoStack(_inArgs);
 
 	*this << lowLevelFunctionTag(_name, _inArgs, _outArgs, _generator);
 
-	appendJump(eth::AssemblyItem::JumpType::IntoFunction);
+	appendJump(evmasm::AssemblyItem::JumpType::IntoFunction);
 	adjustStackOffset(int(_outArgs) - 1 - _inArgs);
 	*this << retTag.tag();
 }
 
-eth::AssemblyItem CompilerContext::lowLevelFunctionTag(
+evmasm::AssemblyItem CompilerContext::lowLevelFunctionTag(
 	string const& _name,
 	unsigned _inArgs,
 	unsigned _outArgs,
@@ -100,7 +101,7 @@ eth::AssemblyItem CompilerContext::lowLevelFunctionTag(
 	auto it = m_lowLevelFunctions.find(_name);
 	if (it == m_lowLevelFunctions.end())
 	{
-		eth::AssemblyItem tag = newTag().pushTag();
+		evmasm::AssemblyItem tag = newTag().pushTag();
 		m_lowLevelFunctions.insert(make_pair(_name, tag));
 		m_lowLevelFunctionGenerationQueue.push(make_tuple(_name, _inArgs, _outArgs, _generator));
 		return tag;
@@ -124,7 +125,7 @@ void CompilerContext::appendMissingLowLevelFunctions()
 		*this << m_lowLevelFunctions.at(name).tag();
 		generator(*this);
 		CompilerUtils(*this).moveToStackTop(outArgs);
-		appendJump(eth::AssemblyItem::JumpType::OutOfFunction);
+		appendJump(evmasm::AssemblyItem::JumpType::OutOfFunction);
 		solAssert(stackHeight() == outArgs, "Invalid stack height in low-level function " + name + ".");
 	}
 }
@@ -169,14 +170,14 @@ unsigned CompilerContext::numberOfLocalVariables() const
 	return m_localVariables.size();
 }
 
-shared_ptr<eth::Assembly> CompilerContext::compiledContract(ContractDefinition const& _contract) const
+shared_ptr<evmasm::Assembly> CompilerContext::compiledContract(ContractDefinition const& _contract) const
 {
 	auto ret = m_otherCompilers.find(&_contract);
 	solAssert(ret != m_otherCompilers.end(), "Compiled contract not found.");
 	return ret->second->assemblyPtr();
 }
 
-shared_ptr<eth::Assembly> CompilerContext::compiledContractRuntime(ContractDefinition const& _contract) const
+shared_ptr<evmasm::Assembly> CompilerContext::compiledContractRuntime(ContractDefinition const& _contract) const
 {
 	auto ret = m_otherCompilers.find(&_contract);
 	solAssert(ret != m_otherCompilers.end(), "Compiled contract not found.");
@@ -188,12 +189,12 @@ bool CompilerContext::isLocalVariable(Declaration const* _declaration) const
 	return !!m_localVariables.count(_declaration);
 }
 
-eth::AssemblyItem CompilerContext::functionEntryLabel(Declaration const& _declaration)
+evmasm::AssemblyItem CompilerContext::functionEntryLabel(Declaration const& _declaration)
 {
 	return m_functionCompilationQueue.entryLabel(_declaration, *this);
 }
 
-eth::AssemblyItem CompilerContext::functionEntryLabelIfExists(Declaration const& _declaration) const
+evmasm::AssemblyItem CompilerContext::functionEntryLabelIfExists(Declaration const& _declaration) const
 {
 	return m_functionCompilationQueue.entryLabelIfExists(_declaration);
 }
@@ -274,9 +275,9 @@ pair<u256, unsigned> CompilerContext::storageLocationOfVariable(Declaration cons
 	return it->second;
 }
 
-CompilerContext& CompilerContext::appendJump(eth::AssemblyItem::JumpType _jumpType)
+CompilerContext& CompilerContext::appendJump(evmasm::AssemblyItem::JumpType _jumpType)
 {
-	eth::AssemblyItem item(Instruction::JUMP);
+	evmasm::AssemblyItem item(Instruction::JUMP);
 	item.setJumpType(_jumpType);
 	return *this << item;
 }
@@ -289,7 +290,7 @@ CompilerContext& CompilerContext::appendInvalid()
 CompilerContext& CompilerContext::appendConditionalInvalid()
 {
 	*this << Instruction::ISZERO;
-	eth::AssemblyItem afterTag = appendConditionalJump();
+	evmasm::AssemblyItem afterTag = appendConditionalJump();
 	*this << Instruction::INVALID;
 	*this << afterTag;
 	return *this;
@@ -369,7 +370,7 @@ void CompilerContext::appendInlineAssembly(
 			BOOST_THROW_EXCEPTION(
 				CompilerError() <<
 				errinfo_sourceLocation(_identifier.location) <<
-				errinfo_comment("Stack too deep (" + to_string(stackDiff) + "), try removing local variables.")
+				util::errinfo_comment("Stack too deep (" + to_string(stackDiff) + "), try removing local variables.")
 			);
 		if (_context == yul::IdentifierContext::RValue)
 			_assembly.appendInstruction(dupInstruction(stackDiff));
@@ -410,7 +411,6 @@ void CompilerContext::appendInlineAssembly(
 		analyzerResult = yul::AsmAnalyzer(
 			analysisInfo,
 			errorReporter,
-			boost::none,
 			dialect,
 			identifierAccess.resolve
 		).analyze(*parserResult);
@@ -423,25 +423,21 @@ void CompilerContext::appendInlineAssembly(
 	{
 		bool const isCreation = m_runtimeContext != nullptr;
 		yul::GasMeter meter(dialect, isCreation, _optimiserSettings.expectedExecutionsPerDeployment);
+		yul::Object obj;
+		obj.code = parserResult;
+		obj.analysisInfo = make_shared<yul::AsmAnalysisInfo>(analysisInfo);
 		yul::OptimiserSuite::run(
 			dialect,
 			&meter,
-			*parserResult,
-			analysisInfo,
+			obj,
 			_optimiserSettings.optimizeStackAllocation,
 			externallyUsedIdentifiers
 		);
-		analysisInfo = yul::AsmAnalysisInfo{};
-		if (!yul::AsmAnalyzer(
-			analysisInfo,
-			errorReporter,
-			boost::none,
-			dialect,
-			identifierAccess.resolve
-		).analyze(*parserResult))
-			reportError("Optimizer introduced error into inline assembly.");
+		analysisInfo = std::move(*obj.analysisInfo);
+		parserResult = std::move(obj.code);
+
 #ifdef SOL_OUTPUT_ASM
-		cout << "After optimizer: " << endl;
+		cout << "After optimizer:" << endl;
 		cout << yul::AsmPrinter()(*parserResult) << endl;
 #endif
 	}
@@ -497,10 +493,10 @@ void CompilerContext::updateSourceLocation()
 	m_asm->setSourceLocation(m_visitedNodes.empty() ? SourceLocation() : m_visitedNodes.top()->location());
 }
 
-eth::Assembly::OptimiserSettings CompilerContext::translateOptimiserSettings(OptimiserSettings const& _settings)
+evmasm::Assembly::OptimiserSettings CompilerContext::translateOptimiserSettings(OptimiserSettings const& _settings)
 {
 	// Constructing it this way so that we notice changes in the fields.
-	eth::Assembly::OptimiserSettings asmSettings{false, false, false, false, false, false, m_evmVersion, 0};
+	evmasm::Assembly::OptimiserSettings asmSettings{false, false, false, false, false, false, m_evmVersion, 0};
 	asmSettings.isCreation = true;
 	asmSettings.runJumpdestRemover = _settings.runJumpdestRemover;
 	asmSettings.runPeephole = _settings.runPeephole;
@@ -512,7 +508,7 @@ eth::Assembly::OptimiserSettings CompilerContext::translateOptimiserSettings(Opt
 	return asmSettings;
 }
 
-eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabel(
+evmasm::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabel(
 	Declaration const& _declaration,
 	CompilerContext& _context
 )
@@ -520,7 +516,7 @@ eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabel(
 	auto res = m_entryLabels.find(&_declaration);
 	if (res == m_entryLabels.end())
 	{
-		eth::AssemblyItem tag(_context.newTag());
+		evmasm::AssemblyItem tag(_context.newTag());
 		m_entryLabels.insert(make_pair(&_declaration, tag));
 		m_functionsToCompile.push(&_declaration);
 		return tag.tag();
@@ -530,10 +526,10 @@ eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabel(
 
 }
 
-eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabelIfExists(Declaration const& _declaration) const
+evmasm::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabelIfExists(Declaration const& _declaration) const
 {
 	auto res = m_entryLabels.find(&_declaration);
-	return res == m_entryLabels.end() ? eth::AssemblyItem(eth::UndefinedItem) : res->second.tag();
+	return res == m_entryLabels.end() ? evmasm::AssemblyItem(evmasm::UndefinedItem) : res->second.tag();
 }
 
 Declaration const* CompilerContext::FunctionCompilationQueue::nextFunctionToCompile() const

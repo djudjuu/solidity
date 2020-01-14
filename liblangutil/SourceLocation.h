@@ -22,15 +22,17 @@
 
 #pragma once
 
-#include <libdevcore/Common.h> // defines noexcept macro for MSVC
+#include <libsolutil/Assertions.h>
+#include <libsolutil/Exceptions.h>
+
 #include <liblangutil/CharStream.h>
+
 #include <memory>
 #include <string>
-#include <ostream>
-#include <tuple>
 
-namespace langutil
+namespace solidity::langutil
 {
+struct SourceLocationError: virtual util::Exception {};
 
 /**
  * Representation of an interval of source positions.
@@ -43,11 +45,39 @@ struct SourceLocation
 		return source.get() == _other.source.get() && start == _other.start && end == _other.end;
 	}
 	bool operator!=(SourceLocation const& _other) const { return !operator==(_other); }
-	inline bool operator<(SourceLocation const& _other) const;
-	inline bool contains(SourceLocation const& _other) const;
-	inline bool intersects(SourceLocation const& _other) const;
+
+	inline bool operator<(SourceLocation const& _other) const
+	{
+		if (!source|| !_other.source)
+			return std::make_tuple(int(!!source), start, end) < std::make_tuple(int(!!_other.source), _other.start, _other.end);
+		else
+			return std::make_tuple(source->name(), start, end) < std::make_tuple(_other.source->name(), _other.start, _other.end);
+	}
+
+	inline bool contains(SourceLocation const& _other) const
+	{
+		if (isEmpty() || _other.isEmpty() || source.get() != _other.source.get())
+			return false;
+		return start <= _other.start && _other.end <= end;
+	}
+
+	inline bool intersects(SourceLocation const& _other) const
+	{
+		if (isEmpty() || _other.isEmpty() || source.get() != _other.source.get())
+			return false;
+		return _other.start < end && start < _other.end;
+	}
 
 	bool isEmpty() const { return start == -1 && end == -1; }
+
+	std::string text() const
+	{
+		assertThrow(source, SourceLocationError, "Requested text from null source.");
+		assertThrow(!isEmpty(), SourceLocationError, "Requested text from empty source location.");
+		assertThrow(start <= end, SourceLocationError, "Invalid source location.");
+		assertThrow(end <= int(source->source().length()), SourceLocationError, "Invalid source location.");
+		return source->source().substr(start, end - start);
+	}
 
 	/// @returns the smallest SourceLocation that contains both @param _a and @param _b.
 	/// Assumes that @param _a and @param _b refer to the same source (exception: if the source of either one
@@ -74,6 +104,8 @@ struct SourceLocation
 	std::shared_ptr<CharStream> source;
 };
 
+SourceLocation const parseSourceLocation(std::string const& _input, std::string const& _sourceName, size_t _maxIndex = -1);
+
 /// Stream output for Location (used e.g. in boost exceptions).
 inline std::ostream& operator<<(std::ostream& _out, SourceLocation const& _location)
 {
@@ -86,28 +118,6 @@ inline std::ostream& operator<<(std::ostream& _out, SourceLocation const& _locat
 	_out << "[" << _location.start << "," << _location.end << ")";
 
 	return _out;
-}
-
-bool SourceLocation::operator<(SourceLocation const& _other) const
-{
-	if (!source|| !_other.source)
-		return std::make_tuple(int(!!source), start, end) < std::make_tuple(int(!!_other.source), _other.start, _other.end);
-	else
-		return std::make_tuple(source->name(), start, end) < std::make_tuple(_other.source->name(), _other.start, _other.end);
-}
-
-bool SourceLocation::contains(SourceLocation const& _other) const
-{
-	if (isEmpty() || _other.isEmpty() || source.get() != _other.source.get())
-		return false;
-	return start <= _other.start && _other.end <= end;
-}
-
-bool SourceLocation::intersects(SourceLocation const& _other) const
-{
-	if (isEmpty() || _other.isEmpty() || source.get() != _other.source.get())
-		return false;
-	return _other.start < end && start < _other.end;
 }
 
 }

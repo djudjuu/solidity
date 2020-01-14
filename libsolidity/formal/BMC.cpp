@@ -23,34 +23,42 @@
 #include <boost/algorithm/string/replace.hpp>
 
 using namespace std;
-using namespace dev;
-using namespace langutil;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::langutil;
+using namespace solidity::frontend;
 
-BMC::BMC(smt::EncodingContext& _context, ErrorReporter& _errorReporter, map<h256, string> const& _smtlib2Responses):
+BMC::BMC(
+	smt::EncodingContext& _context,
+	ErrorReporter& _errorReporter,
+	map<h256, string> const& _smtlib2Responses,
+	ReadCallback::Callback const& _smtCallback,
+	smt::SMTSolverChoice _enabledSolvers
+):
 	SMTEncoder(_context),
-	m_outerErrorReporter(_errorReporter),
-	m_interface(make_shared<smt::SMTPortfolio>(_smtlib2Responses))
+	m_interface(make_unique<smt::SMTPortfolio>(_smtlib2Responses, _smtCallback, _enabledSolvers)),
+	m_outerErrorReporter(_errorReporter)
 {
 #if defined (HAVE_Z3) || defined (HAVE_CVC4)
-	if (!_smtlib2Responses.empty())
-		m_errorReporter.warning(
-			"SMT-LIB2 query responses were given in the auxiliary input, "
-			"but this Solidity binary uses an SMT solver (Z3/CVC4) directly."
-			"These responses will be ignored."
-			"Consider disabling Z3/CVC4 at compilation time in order to use SMT-LIB2 responses."
-		);
+	if (_enabledSolvers.some())
+		if (!_smtlib2Responses.empty())
+			m_errorReporter.warning(
+				"SMT-LIB2 query responses were given in the auxiliary input, "
+				"but this Solidity binary uses an SMT solver (Z3/CVC4) directly."
+				"These responses will be ignored."
+				"Consider disabling Z3/CVC4 at compilation time in order to use SMT-LIB2 responses."
+			);
 #endif
 }
 
-void BMC::analyze(SourceUnit const& _source, shared_ptr<Scanner> const& _scanner)
+void BMC::analyze(SourceUnit const& _source, set<Expression const*> _safeAssertions)
 {
 	solAssert(_source.annotation().experimentalFeatures.count(ExperimentalFeature::SMTChecker), "");
 
-	m_scanner = _scanner;
-
-	m_context.setSolver(m_interface);
+	m_safeAssertions += move(_safeAssertions);
+	m_context.setSolver(m_interface.get());
 	m_context.clear();
+	m_context.setAssertionAccumulation(true);
 	m_variableUsage.setFunctionInlining(true);
 
 	_source.accept(*this);
@@ -76,67 +84,76 @@ void BMC::analyze(SourceUnit const& _source, shared_ptr<Scanner> const& _scanner
 	m_errorReporter.clear();
 }
 
-FunctionDefinition const* BMC::inlinedFunctionCallToDefinition(FunctionCall const& _funCall)
+bool BMC::shouldInlineFunctionCall(FunctionCall const& _funCall)
 {
-	if (_funCall.annotation().kind != FunctionCallKind::FunctionCall)
-		return nullptr;
+	FunctionDefinition const* funDef = functionCallToDefinition(_funCall);
+	if (!funDef || !funDef->isImplemented())
+		return false;
 
 	FunctionType const& funType = dynamic_cast<FunctionType const&>(*_funCall.expression().annotation().type);
 	if (funType.kind() == FunctionType::Kind::External)
 	{
 		auto memberAccess = dynamic_cast<MemberAccess const*>(&_funCall.expression());
-		auto identifier = memberAccess ?
-			dynamic_cast<Identifier const*>(&memberAccess->expression()) :
-			nullptr;
+		if (!memberAccess)
+			return false;
+
+		auto identifier = dynamic_cast<Identifier const*>(&memberAccess->expression());
 		if (!(
 			identifier &&
 			identifier->name() == "this" &&
 			identifier->annotation().referencedDeclaration &&
 			dynamic_cast<MagicVariableDeclaration const*>(identifier->annotation().referencedDeclaration)
 		))
-			return nullptr;
+			return false;
 	}
 	else if (funType.kind() != FunctionType::Kind::Internal)
-		return nullptr;
+		return false;
 
-	FunctionDefinition const* funDef = nullptr;
-	Expression const* calledExpr = &_funCall.expression();
-
-	if (TupleExpression const* fun = dynamic_cast<TupleExpression const*>(&_funCall.expression()))
-	{
-		solAssert(fun->components().size() == 1, "");
-		calledExpr = fun->components().front().get();
-	}
-
-	if (Identifier const* fun = dynamic_cast<Identifier const*>(calledExpr))
-		funDef = dynamic_cast<FunctionDefinition const*>(fun->annotation().referencedDeclaration);
-	else if (MemberAccess const* fun = dynamic_cast<MemberAccess const*>(calledExpr))
-		funDef = dynamic_cast<FunctionDefinition const*>(fun->annotation().referencedDeclaration);
-
-	if (funDef && funDef->isImplemented())
-		return funDef;
-
-	return nullptr;
+	return true;
 }
 
 /// AST visitors.
 
 bool BMC::visit(ContractDefinition const& _contract)
 {
+	initContract(_contract);
+
 	SMTEncoder::visit(_contract);
 
-	/// Check targets created by state variable initialization.
-	smt::Expression constraints = m_context.assertions();
-	checkVerificationTargets(constraints);
-	m_verificationTargets.clear();
+	return false;
+}
 
-	return true;
+void BMC::endVisit(ContractDefinition const& _contract)
+{
+	if (auto constructor = _contract.constructor())
+		constructor->accept(*this);
+	else
+	{
+		inlineConstructorHierarchy(_contract);
+		/// Check targets created by state variable initialization.
+		smt::Expression constraints = m_context.assertions();
+		checkVerificationTargets(constraints);
+		m_verificationTargets.clear();
+	}
+
+	SMTEncoder::endVisit(_contract);
 }
 
 bool BMC::visit(FunctionDefinition const& _function)
 {
+	auto contract = dynamic_cast<ContractDefinition const*>(_function.scope());
+	solAssert(contract, "");
+	solAssert(m_currentContract, "");
+	auto const& hierarchy = m_currentContract->annotation().linearizedBaseContracts;
+	if (find(hierarchy.begin(), hierarchy.end(), contract) == hierarchy.end())
+		createStateVariables(*contract);
+
 	if (m_callStack.empty())
+	{
 		reset();
+		initFunction(_function);
+		resetStateVariables();
+	}
 
 	/// Already visits the children.
 	SMTEncoder::visit(_function);
@@ -403,14 +420,25 @@ void BMC::visitRequire(FunctionCall const& _funCall)
 
 void BMC::inlineFunctionCall(FunctionCall const& _funCall)
 {
-	FunctionDefinition const* funDef = inlinedFunctionCallToDefinition(_funCall);
+	solAssert(shouldInlineFunctionCall(_funCall), "");
+	FunctionDefinition const* funDef = functionCallToDefinition(_funCall);
 	solAssert(funDef, "");
+
 	if (visitedFunction(funDef))
+	{
+		auto const& returnParams = funDef->returnParameters();
+		for (auto param: returnParams)
+		{
+			m_context.newValue(*param);
+			m_context.setUnknownValue(*param);
+		}
+
 		m_errorReporter.warning(
 			_funCall.location(),
 			"Assertion checker does not support recursive function calls.",
 			SecondarySourceLocation().append("Starting from function:", funDef->location())
 		);
+	}
 	else
 	{
 		vector<smt::Expression> funArgs;
@@ -418,42 +446,29 @@ void BMC::inlineFunctionCall(FunctionCall const& _funCall)
 		auto const& funType = dynamic_cast<FunctionType const*>(calledExpr->annotation().type);
 		solAssert(funType, "");
 
+		auto const& functionParams = funDef->parameters();
+		auto const& arguments = _funCall.arguments();
+		unsigned firstParam = 0;
 		if (funType->bound())
 		{
 			auto const& boundFunction = dynamic_cast<MemberAccess const*>(calledExpr);
 			solAssert(boundFunction, "");
-			funArgs.push_back(expr(boundFunction->expression()));
+			funArgs.push_back(expr(boundFunction->expression(), functionParams.front()->type()));
+			firstParam = 1;
 		}
 
-		for (auto arg: _funCall.arguments())
-			funArgs.push_back(expr(*arg));
+		solAssert((arguments.size() + firstParam) == functionParams.size(), "");
+		for (unsigned i = 0; i < arguments.size(); ++i)
+			funArgs.push_back(expr(*arguments.at(i), functionParams.at(i + firstParam)->type()));
 		initializeFunctionCallParameters(*funDef, funArgs);
 
 		// The reason why we need to pushCallStack here instead of visit(FunctionDefinition)
 		// is that there we don't have `_funCall`.
 		pushCallStack({funDef, &_funCall});
-		// If an internal function is called to initialize
-		// a state variable.
-		if (m_callStack.empty())
-			initFunction(*funDef);
 		funDef->accept(*this);
-
-		auto const& returnParams = funDef->returnParameters();
-		if (returnParams.size() > 1)
-		{
-			vector<shared_ptr<smt::SymbolicVariable>> components;
-			for (auto param: returnParams)
-			{
-				solAssert(m_context.variable(*param), "");
-				components.push_back(m_context.variable(*param));
-			}
-			auto const& symbTuple = dynamic_pointer_cast<smt::SymbolicTupleVariable>(m_context.expression(_funCall));
-			solAssert(symbTuple, "");
-			symbTuple->setComponents(move(components));
-		}
-		else if (returnParams.size() == 1)
-			defineExpr(_funCall, currentValue(*returnParams.front()));
 	}
+
+	createReturnedExpressions(_funCall);
 }
 
 void BMC::abstractFunctionCall(FunctionCall const& _funCall)
@@ -468,9 +483,8 @@ void BMC::abstractFunctionCall(FunctionCall const& _funCall)
 
 void BMC::internalOrExternalFunctionCall(FunctionCall const& _funCall)
 {
-	auto funDef = inlinedFunctionCallToDefinition(_funCall);
 	auto const& funType = dynamic_cast<FunctionType const&>(*_funCall.expression().annotation().type);
-	if (funDef)
+	if (shouldInlineFunctionCall(_funCall))
 		inlineFunctionCall(_funCall);
 	else if (funType.kind() == FunctionType::Kind::Internal)
 		m_errorReporter.warning(
@@ -547,7 +561,7 @@ pair<vector<smt::Expression>, vector<string>> BMC::modelExpressions()
 		if (uf->annotation().type->isValueType())
 		{
 			expressionsToEvaluate.emplace_back(expr(*uf));
-			expressionNames.push_back(m_scanner->sourceAt(uf->location()));
+			expressionNames.push_back(uf->location().text());
 		}
 
 	return {expressionsToEvaluate, expressionNames};
@@ -673,13 +687,14 @@ void BMC::checkBalance(VerificationTarget& _target)
 void BMC::checkAssert(VerificationTarget& _target)
 {
 	solAssert(_target.type == VerificationTarget::Type::Assert, "");
-	checkCondition(
-		_target.constraints && !_target.value,
-		_target.callStack,
-		_target.modelExpressions,
-		_target.expression->location(),
-		"Assertion violation"
-	);
+	if (!m_safeAssertions.count(_target.expression))
+		checkCondition(
+			_target.constraints && !_target.value,
+			_target.callStack,
+			_target.modelExpressions,
+			_target.expression->location(),
+			"Assertion violation"
+		);
 }
 
 void BMC::addVerificationTarget(
@@ -721,14 +736,11 @@ void BMC::checkCondition(
 	vector<string> expressionNames;
 	tie(expressionsToEvaluate, expressionNames) = _modelExpressions;
 	if (callStack.size())
-	{
-		solAssert(m_scanner, "");
 		if (_additionalValue)
 		{
 			expressionsToEvaluate.emplace_back(*_additionalValue);
 			expressionNames.push_back(_additionalValueName);
 		}
-	}
 	smt::CheckResult result;
 	vector<string> values;
 	tie(result, values) = checkSatisfiableAndGenerateModel(expressionsToEvaluate);

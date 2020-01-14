@@ -53,21 +53,23 @@
 #include <liblangutil/Common.h>
 #include <liblangutil/Exceptions.h>
 #include <liblangutil/Scanner.h>
-#include <boost/optional.hpp>
+
 #include <algorithm>
+#include <optional>
 #include <ostream>
 #include <tuple>
 
 using namespace std;
-using namespace langutil;
 
-string langutil::to_string(ScannerError _errorCode)
+namespace solidity::langutil {
+
+string to_string(ScannerError _errorCode)
 {
 	switch (_errorCode)
 	{
 		case ScannerError::NoError: return "No error.";
 		case ScannerError::IllegalToken: return "Invalid token.";
-		case ScannerError::IllegalHexString: return "Expected even number of hex-nibbles within double-quotes.";
+		case ScannerError::IllegalHexString: return "Expected even number of hex-nibbles.";
 		case ScannerError::IllegalHexDigit: return "Hexadecimal digit missing or invalid.";
 		case ScannerError::IllegalCommentTerminator: return "Expected multi-line comment-terminator.";
 		case ScannerError::IllegalEscapeSequence: return "Invalid escape sequence.";
@@ -83,13 +85,10 @@ string langutil::to_string(ScannerError _errorCode)
 }
 
 
-ostream& langutil::operator<<(ostream& os, ScannerError _errorCode)
+ostream& operator<<(ostream& os, ScannerError _errorCode)
 {
 	return os << to_string(_errorCode);
 }
-
-namespace langutil
-{
 
 /// Scoped helper for literal recording. Automatically drops the literal
 /// if aborting the scanning before it's complete.
@@ -130,8 +129,6 @@ private:
 	Scanner* m_scanner;
 	bool m_complete;
 };
-
-}
 
 void Scanner::reset(CharStream _source)
 {
@@ -187,7 +184,7 @@ bool Scanner::scanHexByte(char& o_scannedByte)
 	return true;
 }
 
-boost::optional<unsigned> Scanner::scanUnicode()
+std::optional<unsigned> Scanner::scanUnicode()
 {
 	unsigned x = 0;
 	for (int i = 0; i < 4; i++)
@@ -280,6 +277,29 @@ Token Scanner::skipSingleLineComment()
 	return Token::Whitespace;
 }
 
+bool Scanner::atEndOfLine() const
+{
+	return m_char == '\n' || m_char == '\r';
+}
+
+bool Scanner::tryScanEndOfLine()
+{
+	if (m_char == '\n')
+	{
+		advance();
+		return true;
+	}
+
+	if (m_char == '\r')
+	{
+		if (advance() && m_char == '\n')
+			advance();
+		return true;
+	}
+
+	return false;
+}
+
 Token Scanner::scanSingleLineDocComment()
 {
 	LiteralScope literal(this, LITERAL_TYPE_COMMENT);
@@ -289,7 +309,7 @@ Token Scanner::scanSingleLineDocComment()
 
 	while (!isSourcePastEndOfInput())
 	{
-		if (isLineTerminator(m_char))
+		if (tryScanEndOfLine())
 		{
 			// check if next line is also a documentation comment
 			skipWhitespace();
@@ -303,7 +323,6 @@ Token Scanner::scanSingleLineDocComment()
 			}
 			else
 				break; // next line is not a documentation comment, we are done
-
 		}
 		else if (isUnicodeLinebreak())
 			// Any line terminator that is not '\n' is considered to end the
@@ -343,13 +362,13 @@ Token Scanner::scanMultiLineDocComment()
 	bool endFound = false;
 	bool charsAdded = false;
 
-	while (isWhiteSpace(m_char) && !isLineTerminator(m_char))
+	while (isWhiteSpace(m_char) && !atEndOfLine())
 		advance();
 
 	while (!isSourcePastEndOfInput())
 	{
 		//handle newlines in multline comments
-		if (isLineTerminator(m_char))
+		if (atEndOfLine())
 		{
 			skipWhitespace();
 			if (!m_source->isPastEndOfInput(1) && m_source->get(0) == '*' && m_source->get(1) == '*')
@@ -664,10 +683,12 @@ void Scanner::scanToken()
 bool Scanner::scanEscape()
 {
 	char c = m_char;
-	advance();
+
 	// Skip escaped newlines.
-	if (isLineTerminator(c))
+	if (tryScanEndOfLine())
 		return true;
+	advance();
+
 	switch (c)
 	{
 	case '\'':  // fall through
@@ -694,7 +715,7 @@ bool Scanner::scanEscape()
 		break;
 	case 'u':
 	{
-		if (boost::optional<unsigned> codepoint = scanUnicode())
+		if (auto const codepoint = scanUnicode(); codepoint.has_value())
 			addUnicodeAsUTF8(*codepoint);
 		else
 			return false;
@@ -759,13 +780,25 @@ Token Scanner::scanHexString()
 	char const quote = m_char;
 	advance();  // consume quote
 	LiteralScope literal(this, LITERAL_TYPE_STRING);
+	bool allowUnderscore = false;
 	while (m_char != quote && !isSourcePastEndOfInput())
 	{
 		char c = m_char;
-		if (!scanHexByte(c))
-			// can only return false if hex-byte is incomplete (only one hex digit instead of two)
+
+		if (scanHexByte(c))
+		{
+			addLiteralChar(c);
+			allowUnderscore = true;
+		}
+		else if (c == '_')
+		{
+			advance();
+			if (!allowUnderscore || m_char == quote)
+				return setError(ScannerError::IllegalNumberSeparator);
+			allowUnderscore = false;
+		}
+		else
 			return setError(ScannerError::IllegalHexString);
-		addLiteralChar(c);
 	}
 
 	if (m_char != quote)
@@ -773,7 +806,7 @@ Token Scanner::scanHexString()
 
 	literal.complete();
 	advance();  // consume quote
-	return Token::StringLiteral;
+	return Token::HexStringLiteral;
 }
 
 // Parse for regex [:digit:]+(_[:digit:]+)*
@@ -896,3 +929,5 @@ tuple<Token, unsigned, unsigned> Scanner::scanIdentifierOrKeyword()
 	literal.complete();
 	return TokenTraits::fromIdentifierOrKeyword(m_nextToken.literal);
 }
+
+} // namespace solidity::langutil

@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonData.h>
 #include <libsolidity/ast/Types.h>
 #include <liblangutil/Exceptions.h>
 #include <test/libsolidity/util/SoltestTypes.h>
@@ -27,11 +27,7 @@
 #include <vector>
 #include <utility>
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 /**
@@ -46,6 +42,8 @@ namespace test
  * // -> 2, 3
  * // h(uint256), 1 ether: 42
  * // -> FAILURE                # If REVERT or other EVM failure was detected #
+ * // ()                        # Call fallback function #
+ * // (), 1 ether               # Call ether function #
  * ...
  */
 class TestFileParser
@@ -59,7 +57,9 @@ public:
 	/// Throws an exception if a function call cannot be parsed because of its
 	/// incorrect structure, an invalid or unsupported encoding
 	/// of its arguments or expected results.
-	std::vector<FunctionCall> parseFunctionCalls();
+	/// Passes the source line offset, such that parsing errors can be enhanced
+	/// with a line number it occurred in.
+	std::vector<FunctionCall> parseFunctionCalls(std::size_t _lineOffset);
 
 private:
 	using Token = soltest::Token;
@@ -87,15 +87,16 @@ private:
 		std::string scanDecimalNumber();
 		std::string scanHexNumber();
 		std::string scanString();
+		char scanHexPart();
 
 	private:
 		using TokenDesc = std::pair<Token, std::string>;
 
 		/// Advances current position in the input stream.
-		void advance()
+		void advance(unsigned n = 1)
 		{
 			solAssert(m_char != m_line.end(), "Cannot advance beyond end.");
-			++m_char;
+			m_char = std::next(m_char, n);
 		}
 
 		/// Returns the current character or '\0' if at end of input.
@@ -125,8 +126,10 @@ private:
 	bool accept(soltest::Token _token, bool const _expect = false);
 	bool expect(soltest::Token _token, bool const _advance = true);
 
-	/// Parses a function call signature in the form of f(uint256, ...).
-	std::string parseFunctionSignature();
+	/// Parses a function call signature in the form of `f(uint256, ...)` and
+	/// returns the signature and a flag that indicates if the function name was
+	/// empty. If so, the signature is not allowed to define any parameters.
+	std::pair<std::string, bool> parseFunctionSignature();
 
 	/// Parses the optional ether value that can be passed alongside the
 	/// function call arguments. Throws an InvalidEtherValueEncoding exception
@@ -179,8 +182,10 @@ private:
 
 	/// A scanner instance
 	Scanner m_scanner;
+
+	/// The current line number. Incremented when Token::Newline (//) is found and
+	/// used to enhance parser error messages.
+	size_t m_lineNumber = 0;
 };
 
-}
-}
 }

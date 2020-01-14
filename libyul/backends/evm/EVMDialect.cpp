@@ -35,27 +35,24 @@
 #include <boost/range/adaptor/reversed.hpp>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
 
 namespace
 {
 pair<YulString, BuiltinFunctionForEVM> createEVMFunction(
 	string const& _name,
-	dev::eth::Instruction _instruction
+	evmasm::Instruction _instruction
 )
 {
-	eth::InstructionInfo info = dev::eth::instructionInfo(_instruction);
+	evmasm::InstructionInfo info = evmasm::instructionInfo(_instruction);
 	BuiltinFunctionForEVM f;
 	f.name = YulString{_name};
 	f.parameters.resize(info.args);
 	f.returns.resize(info.ret);
-	f.movable = eth::SemanticInformation::movable(_instruction);
-	f.sideEffectFree = eth::SemanticInformation::sideEffectFree(_instruction);
-	f.sideEffectFreeIfNoMSize = eth::SemanticInformation::sideEffectFreeIfNoMSize(_instruction);
-	f.isMSize = _instruction == dev::eth::Instruction::MSIZE;
-	f.invalidatesStorage = eth::SemanticInformation::invalidatesStorage(_instruction);
-	f.invalidatesMemory = eth::SemanticInformation::invalidatesMemory(_instruction);
+	f.sideEffects = EVMDialect::sideEffectsOfInstruction(_instruction);
+	f.isMSize = _instruction == evmasm::Instruction::MSIZE;
 	f.literalArguments = false;
 	f.instruction = _instruction;
 	f.generateCode = [_instruction](
@@ -75,11 +72,7 @@ pair<YulString, BuiltinFunctionForEVM> createFunction(
 	string _name,
 	size_t _params,
 	size_t _returns,
-	bool _movable,
-	bool _sideEffectFree,
-	bool _sideEffectFreeIfNoMSize,
-	bool _invalidatesStorage,
-	bool _invalidatesMemory,
+	SideEffects _sideEffects,
 	bool _literalArguments,
 	std::function<void(FunctionCall const&, AbstractAssembly&, BuiltinContext&, std::function<void()>)> _generateCode
 )
@@ -89,13 +82,9 @@ pair<YulString, BuiltinFunctionForEVM> createFunction(
 	f.name = name;
 	f.parameters.resize(_params);
 	f.returns.resize(_returns);
-	f.movable = _movable;
+	f.sideEffects = std::move(_sideEffects);
 	f.literalArguments = _literalArguments;
-	f.sideEffectFree = _sideEffectFree;
-	f.sideEffectFreeIfNoMSize = _sideEffectFreeIfNoMSize;
 	f.isMSize = false;
-	f.invalidatesStorage = _invalidatesStorage;
-	f.invalidatesMemory = _invalidatesMemory;
 	f.instruction = {};
 	f.generateCode = std::move(_generateCode);
 	return {name, f};
@@ -106,17 +95,17 @@ map<YulString, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVe
 	map<YulString, BuiltinFunctionForEVM> builtins;
 	for (auto const& instr: Parser::instructions())
 		if (
-			!dev::eth::isDupInstruction(instr.second) &&
-			!dev::eth::isSwapInstruction(instr.second) &&
-			instr.second != eth::Instruction::JUMP &&
-			instr.second != eth::Instruction::JUMPI &&
+			!evmasm::isDupInstruction(instr.second) &&
+			!evmasm::isSwapInstruction(instr.second) &&
+			instr.second != evmasm::Instruction::JUMP &&
+			instr.second != evmasm::Instruction::JUMPI &&
 			_evmVersion.hasOpcode(instr.second)
 		)
 			builtins.emplace(createEVMFunction(instr.first, instr.second));
 
 	if (_objectAccess)
 	{
-		builtins.emplace(createFunction("datasize", 1, 1, true, true, true, false, false, true, [](
+		builtins.emplace(createFunction("datasize", 1, 1, SideEffects{}, true, [](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
 			BuiltinContext& _context,
@@ -125,7 +114,7 @@ map<YulString, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVe
 			yulAssert(_context.currentObject, "No object available.");
 			yulAssert(_call.arguments.size() == 1, "");
 			Expression const& arg = _call.arguments.front();
-			YulString dataName = boost::get<Literal>(arg).value;
+			YulString dataName = std::get<Literal>(arg).value;
 			if (_context.currentObject->name == dataName)
 				_assembly.appendAssemblySize();
 			else
@@ -137,7 +126,7 @@ map<YulString, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVe
 				_assembly.appendDataSize(_context.subIDs.at(dataName));
 			}
 		}));
-		builtins.emplace(createFunction("dataoffset", 1, 1, true, true, true, false, false, true, [](
+		builtins.emplace(createFunction("dataoffset", 1, 1, SideEffects{}, true, [](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
 			BuiltinContext& _context,
@@ -146,7 +135,7 @@ map<YulString, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVe
 			yulAssert(_context.currentObject, "No object available.");
 			yulAssert(_call.arguments.size() == 1, "");
 			Expression const& arg = _call.arguments.front();
-			YulString dataName = boost::get<Literal>(arg).value;
+			YulString dataName = std::get<Literal>(arg).value;
 			if (_context.currentObject->name == dataName)
 				_assembly.appendConstant(0);
 			else
@@ -158,15 +147,22 @@ map<YulString, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVe
 				_assembly.appendDataOffset(_context.subIDs.at(dataName));
 			}
 		}));
-		builtins.emplace(createFunction("datacopy", 3, 0, false, false, false, false, true, false, [](
-			FunctionCall const&,
-			AbstractAssembly& _assembly,
-			BuiltinContext&,
-			std::function<void()> _visitArguments
-		) {
-			_visitArguments();
-			_assembly.appendInstruction(dev::eth::Instruction::CODECOPY);
-		}));
+		builtins.emplace(createFunction(
+			"datacopy",
+			3,
+			0,
+			SideEffects{false, false, false, false, true},
+			false,
+			[](
+				FunctionCall const&,
+				AbstractAssembly& _assembly,
+				BuiltinContext&,
+				std::function<void()> _visitArguments
+			) {
+				_visitArguments();
+				_assembly.appendInstruction(evmasm::Instruction::CODECOPY);
+			}
+		));
 	}
 	return builtins;
 }
@@ -188,15 +184,6 @@ BuiltinFunctionForEVM const* EVMDialect::builtin(YulString _name) const
 		return &it->second;
 	else
 		return nullptr;
-}
-
-EVMDialect const& EVMDialect::looseAssemblyForEVM(langutil::EVMVersion _version)
-{
-	static map<langutil::EVMVersion, unique_ptr<EVMDialect const>> dialects;
-	static YulStringRepository::ResetCallback callback{[&] { dialects.clear(); }};
-	if (!dialects[_version])
-		dialects[_version] = make_unique<EVMDialect>(AsmFlavour::Loose, false, _version);
-	return *dialects[_version];
 }
 
 EVMDialect const& EVMDialect::strictAssemblyForEVM(langutil::EVMVersion _version)
@@ -224,4 +211,15 @@ EVMDialect const& EVMDialect::yulForEVM(langutil::EVMVersion _version)
 	if (!dialects[_version])
 		dialects[_version] = make_unique<EVMDialect>(AsmFlavour::Yul, false, _version);
 	return *dialects[_version];
+}
+
+SideEffects EVMDialect::sideEffectsOfInstruction(evmasm::Instruction _instruction)
+{
+	return SideEffects{
+		evmasm::SemanticInformation::movable(_instruction),
+		evmasm::SemanticInformation::sideEffectFree(_instruction),
+		evmasm::SemanticInformation::sideEffectFreeIfNoMSize(_instruction),
+		evmasm::SemanticInformation::invalidatesStorage(_instruction),
+		evmasm::SemanticInformation::invalidatesMemory(_instruction)
+	};
 }

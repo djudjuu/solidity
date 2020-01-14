@@ -9,12 +9,12 @@ contract C {
 //     :C
 // [
 //   {
-//     "constant": false,
 //     "inputs": [],
 //     "name": "f",
 //     "outputs":
 //     [
 //       {
+//         "internalType": "uint256",
 //         "name": "x",
 //         "type": "uint256"
 //       },
@@ -22,6 +22,7 @@ contract C {
 //         "components":
 //         [
 //           {
+//             "internalType": "uint256",
 //             "name": "a",
 //             "type": "uint256"
 //           },
@@ -29,19 +30,21 @@ contract C {
 //             "components":
 //             [
 //               {
+//                 "internalType": "uint256[2]",
 //                 "name": "x",
 //                 "type": "uint256[2]"
 //               }
 //             ],
+//             "internalType": "struct C.T[]",
 //             "name": "sub",
 //             "type": "tuple[]"
 //           }
 //         ],
+//         "internalType": "struct C.S",
 //         "name": "s",
 //         "type": "tuple"
 //       }
 //     ],
-//     "payable": false,
 //     "stateMutability": "nonpayable",
 //     "type": "function"
 //   }

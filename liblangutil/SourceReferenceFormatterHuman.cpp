@@ -25,9 +25,10 @@
 #include <iomanip>
 
 using namespace std;
-using namespace dev;
-using namespace dev::formatting;
-using namespace langutil;
+using namespace solidity;
+using namespace solidity::langutil;
+using namespace solidity::util;
+using namespace solidity::util::formatting;
 
 AnsiColorized SourceReferenceFormatterHuman::normalColored() const
 {
@@ -73,7 +74,7 @@ void SourceReferenceFormatterHuman::printSourceLocation(SourceReference const& _
 
 	// line 0: source name
 	frameColored() << string(leftpad, ' ') << "--> ";
-	m_stream << _ref.sourceName << ":" << (_ref.position.line + 1) << ":" << (_ref.position.column + 1) << ": " << '\n';
+	m_stream << _ref.sourceName << ":" << (_ref.position.line + 1) << ":" << (_ref.position.column + 1) << ":" << '\n';
 
 	if (!_ref.multiline)
 	{

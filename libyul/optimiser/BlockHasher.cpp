@@ -21,11 +21,12 @@
 #include <libyul/optimiser/BlockHasher.h>
 #include <libyul/optimiser/SyntacticalEquality.h>
 #include <libyul/Utilities.h>
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonData.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
 
 namespace
 {
@@ -74,14 +75,6 @@ void BlockHasher::operator()(Identifier const& _identifier)
 	else
 		hash64(compileTimeLiteralHash("internal"));
 	hash64(it->second.id);
-}
-
-void BlockHasher::operator()(FunctionalInstruction const& _instr)
-{
-	hash64(compileTimeLiteralHash("FunctionalInstruction"));
-	hash8(static_cast<std::underlying_type_t<eth::Instruction>>(_instr.instruction));
-	hash64(_instr.arguments.size());
-	ASTWalker::operator()(_instr);
 }
 
 void BlockHasher::operator()(FunctionCall const& _funCall)
@@ -173,6 +166,11 @@ void BlockHasher::operator()(Continue const& _continue)
 	ASTWalker::operator()(_continue);
 }
 
+void BlockHasher::operator()(Leave const& _leaveStatement)
+{
+	hash64(compileTimeLiteralHash("Leave"));
+	ASTWalker::operator()(_leaveStatement);
+}
 
 void BlockHasher::operator()(Block const& _block)
 {

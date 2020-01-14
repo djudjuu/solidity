@@ -9,3 +9,5 @@ ba
 fo
 compilability
 errorstring
+hist
+otion

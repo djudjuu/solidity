@@ -29,9 +29,7 @@
 #include <liblangutil/EVMVersion.h>
 #include <string>
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class SourceUnit;
@@ -56,6 +54,8 @@ private:
 
 	/// Generates code for and returns the name of the function.
 	std::string generateFunction(FunctionDefinition const& _function);
+	/// Generates a getter for the given declaration and returns its name
+	std::string generateGetter(VariableDeclaration const& _varDecl);
 
 	std::string constructorCode(ContractDefinition const& _contract);
 	std::string deployCode(ContractDefinition const& _contract);
@@ -77,5 +77,4 @@ private:
 	YulUtilFunctions m_utils;
 };
 
-}
 }

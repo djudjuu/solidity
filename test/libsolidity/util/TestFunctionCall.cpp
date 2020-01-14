@@ -17,16 +17,17 @@
 #include <test/libsolidity/util/BytesUtils.h>
 #include <test/libsolidity/util/ContractABIUtils.h>
 
-#include <libdevcore/AnsiColorized.h>
+#include <libsolutil/AnsiColorized.h>
 
 #include <boost/algorithm/string/replace.hpp>
 
+#include <optional>
 #include <stdexcept>
 #include <string>
 
-using namespace dev;
 using namespace solidity;
-using namespace dev::solidity::test;
+using namespace solidity::util;
+using namespace solidity::frontend::test;
 using namespace std;
 
 string TestFunctionCall::format(
@@ -54,6 +55,12 @@ string TestFunctionCall::format(
 		string newline = formatToken(Token::Newline);
 		string failure = formatToken(Token::Failure);
 
+		if (m_call.isLibrary)
+		{
+			stream << _linePrefix << newline << ws << "library:" << ws << m_call.signature;
+			return;
+		}
+
 		/// Formats the function signature. This is the same independent from the display-mode.
 		stream << _linePrefix << newline << ws << m_call.signature;
 		if (m_call.value > u256(0))
@@ -62,7 +69,7 @@ string TestFunctionCall::format(
 		{
 			string output = formatRawParameters(m_call.arguments.parameters, _linePrefix);
 			stream << colon;
-			if (_singleLine)
+			if (!m_call.arguments.parameters.at(0).format.newline)
 				stream << ws;
 			stream << output;
 
@@ -74,7 +81,14 @@ string TestFunctionCall::format(
 		{
 			if (!m_call.arguments.comment.empty())
 				stream << ws << comment << m_call.arguments.comment << comment;
-			stream << ws << arrow << ws;
+
+			if (m_call.omitsArrow)
+			{
+				if (_renderResult && (m_failure || !matchesExpectation()))
+					stream << ws << arrow;
+			}
+			else
+				stream << ws << arrow;
 		}
 		else
 		{
@@ -84,26 +98,26 @@ string TestFunctionCall::format(
 				 stream << comment << m_call.arguments.comment << comment;
 				 stream << endl << _linePrefix << newline << ws;
 			}
-			stream << arrow << ws;
+			stream << arrow;
 		}
 
 		/// Format either the expected output or the actual result output
 		string result;
 		if (!_renderResult)
 		{
-			bytes output = m_call.expectations.rawBytes();
 			bool const isFailure = m_call.expectations.failure;
 			result = isFailure ?
-				failure :
+				formatFailure(_errorReporter, m_call, m_rawBytes, _renderResult, highlight) :
 				formatRawParameters(m_call.expectations.result);
-			AnsiColorized(stream, highlight, {dev::formatting::RED_BACKGROUND}) << result;
+			if (!result.empty())
+				AnsiColorized(stream, highlight, {util::formatting::RED_BACKGROUND}) << ws << result;
 		}
 		else
 		{
 			bytes output = m_rawBytes;
 			bool const isFailure = m_failure;
 			result = isFailure ?
-				failure :
+				formatFailure(_errorReporter, m_call, output, _renderResult, highlight) :
 				matchesExpectation() ?
 					formatRawParameters(m_call.expectations.result) :
 					formatBytesParameters(
@@ -114,10 +128,42 @@ string TestFunctionCall::format(
 						highlight
 					);
 
+			if (!matchesExpectation())
+			{
+				std::optional<ParameterList> abiParams;
+
+				if (isFailure)
+				{
+					if (!output.empty())
+						abiParams = ContractABIUtils::failureParameters(output);
+				}
+				else
+					abiParams = ContractABIUtils::parametersFromJsonOutputs(
+						_errorReporter,
+						m_contractABI,
+						m_call.signature
+					);
+
+				string bytesOutput = abiParams ?
+					BytesUtils::formatRawBytes(output, abiParams.value(), _linePrefix) :
+					BytesUtils::formatRawBytes(
+						output,
+						ContractABIUtils::defaultParameters(ceil(output.size() / 32)),
+						_linePrefix
+					);
+
+				_errorReporter.warning(
+					"The call to \"" + m_call.signature + "\" returned \n" +
+					bytesOutput
+				);
+			}
+
 			if (isFailure)
-				AnsiColorized(stream, highlight, {dev::formatting::RED_BACKGROUND}) << result;
+				AnsiColorized(stream, highlight, {util::formatting::RED_BACKGROUND}) << ws << result;
 			else
-				stream << result;
+				if (!result.empty())
+					stream << ws << result;
+
 		}
 
 		/// Format comments on expectations taking the display-mode into account.
@@ -144,147 +190,109 @@ string TestFunctionCall::formatBytesParameters(
 	ErrorReporter& _errorReporter,
 	bytes const& _bytes,
 	string const& _signature,
-	dev::solidity::test::ParameterList const& _params,
-	bool _highlight
+	solidity::frontend::test::ParameterList const& _parameters,
+	bool _highlight,
+	bool _failure
 ) const
 {
-	using ParameterList = dev::solidity::test::ParameterList;
+	using ParameterList = solidity::frontend::test::ParameterList;
 
 	stringstream os;
-	string functionName{_signature.substr(0, _signature.find("("))};
 
-	/// Create parameters from Contract ABI. Used to generate values for
-	/// auto-correction during interactive update routine.
-	ParameterList abiParams = ContractABIUtils().parametersFromJson(m_contractABI, functionName);
-
-	/// If parameter count does not match, take types defined by ABI, but only
-	/// if the contract ABI is defined (needed for format tests where the actual
-	/// result does not matter).
-	ParameterList preferredParams;
-	if (m_contractABI && (_params.size() != abiParams.size()))
-	{
-		auto sizeFold = [](size_t const _a, Parameter const& _b) { return _a + _b.abiType.size; };
-		size_t encodingSize = std::accumulate(_params.begin(), _params.end(), size_t{0}, sizeFold);
-
-		_errorReporter.warning(
-			"Encoding does not match byte range. The call returned " +
-			to_string(_bytes.size()) + " bytes, but " +
-			to_string(encodingSize) + " bytes were expected."
-		);
-		preferredParams = abiParams;
-	}
-	else
-		preferredParams = _params;
-
-	/// If output is empty, do not format anything.
 	if (_bytes.empty())
 		return {};
 
-	/// Format output bytes with the given parameters. ABI type takes precedence if:
-	/// - size of ABI type is greater
-	/// - given expected type does not match and needs to be overridden in order
-	///   to generate a valid output of the parameter
-	auto it = _bytes.begin();
-	auto abiParam = abiParams.begin();
-	size_t paramIndex = 1;
-	for (auto const& param: preferredParams)
+	if (_failure)
 	{
-		size_t size = param.abiType.size;
-		if (m_contractABI)
-			size = std::max((*abiParam).abiType.size, param.abiType.size);
+		os << BytesUtils::formatBytesRange(
+			_bytes,
+			ContractABIUtils::failureParameters(_bytes),
+			_highlight
+		);
 
-		long offset = static_cast<long>(size);
-		auto offsetIter = it + offset;
-		bytes byteRange{it, offsetIter};
-
-		/// Override type with ABI type if given one does not match.
-		auto type = param.abiType;
-		if (m_contractABI)
-			if ((*abiParam).abiType.type > param.abiType.type)
-			{
-				type = (*abiParam).abiType;
-				_errorReporter.warning(
-					"Type of parameter " + to_string(paramIndex) +
-					" does not match the one inferred from ABI."
-				);
-			}
-
-		/// Prints obtained result if it does not match the expectation
-		/// and prints the expected result otherwise.
-		/// Highlights parameter only if it does not match.
-		if (byteRange != param.rawBytes)
-			AnsiColorized(
-				os,
-				_highlight,
-				{dev::formatting::RED_BACKGROUND}
-			) << formatBytesRange(byteRange, type);
-		else
-			os << param.rawString;
-
-		if (abiParam != abiParams.end())
-			abiParam++;
-
-		it += offset;
-		paramIndex++;
-		if (&param != &preferredParams.back())
-			os << ", ";
+		return os.str();
 	}
-	return os.str();
+	else
+	{
+		std::optional<ParameterList> abiParams = ContractABIUtils::parametersFromJsonOutputs(
+			_errorReporter,
+			m_contractABI,
+			_signature
+		);
+
+		if (abiParams)
+		{
+			std::optional<ParameterList> preferredParams = ContractABIUtils::preferredParameters(
+				_errorReporter,
+				_parameters,
+				abiParams.value(),
+				_bytes
+			);
+
+			if (preferredParams)
+			{
+				ContractABIUtils::overwriteParameters(_errorReporter, preferredParams.value(), abiParams.value());
+				os << BytesUtils::formatBytesRange(_bytes, preferredParams.value(), _highlight);
+			}
+		}
+		else
+		{
+			ParameterList defaultParameters = ContractABIUtils::defaultParameters(ceil(_bytes.size() / 32));
+
+			ContractABIUtils::overwriteParameters(_errorReporter, defaultParameters, _parameters);
+			os << BytesUtils::formatBytesRange(_bytes, defaultParameters, _highlight);
+		}
+		return os.str();
+	}
 }
 
-string TestFunctionCall::formatBytesRange(
-	bytes const& _bytes,
-	ABIType const& _abiType
+string TestFunctionCall::formatFailure(
+	ErrorReporter& _errorReporter,
+	solidity::frontend::test::FunctionCall const& _call,
+	bytes const& _output,
+	bool _renderResult,
+	bool _highlight
 ) const
 {
+	using Token = soltest::Token;
+
 	stringstream os;
 
-	switch (_abiType.type)
-	{
-	case ABIType::UnsignedDec:
-		// Check if the detected type was wrong and if this could
-		// be signed. If an unsigned was detected in the expectations,
-		// but the actual result returned a signed, it would be formatted
-		// incorrectly.
-		os << BytesUtils().formatUnsigned(_bytes);
-		break;
-	case ABIType::SignedDec:
-		os << BytesUtils().formatSigned(_bytes);
-		break;
-	case ABIType::Boolean:
-		os << BytesUtils().formatBoolean(_bytes);
-		break;
-	case ABIType::Hex:
-		os << BytesUtils().formatHex(_bytes);
-		break;
-	case ABIType::HexString:
-		os << BytesUtils().formatHexString(_bytes);
-		break;
-	case ABIType::String:
-		os << BytesUtils().formatString(_bytes);
-		break;
-	case ABIType::Failure:
-		break;
-	case ABIType::None:
-		break;
-	}
+	os << formatToken(Token::Failure);
+
+	if (!_output.empty())
+		os << ", ";
+
+	if (_renderResult)
+		os << formatBytesParameters(
+			_errorReporter,
+			_output,
+			_call.signature,
+			_call.expectations.result,
+			_highlight,
+			true
+		);
+	else
+		os << formatRawParameters(_call.expectations.result);
+
 	return os.str();
 }
 
 string TestFunctionCall::formatRawParameters(
-	dev::solidity::test::ParameterList const& _params,
+	solidity::frontend::test::ParameterList const& _params,
 	std::string const& _linePrefix
 ) const
 {
 	stringstream os;
 	for (auto const& param: _params)
-	{
-		if (param.format.newline)
-			os << endl << _linePrefix << "// ";
-		os << param.rawString;
-		if (&param != &_params.back())
-			os << ", ";
-	}
+		if (!param.rawString.empty())
+		{
+			if (param.format.newline)
+				os << endl << _linePrefix << "// ";
+			os << param.rawString;
+			if (&param != &_params.back())
+				os << ", ";
+		}
 	return os.str();
 }
 

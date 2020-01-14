@@ -21,10 +21,13 @@
 #pragma once
 
 #include <libyul/optimiser/ASTWalker.h>
+#include <libyul/SideEffects.h>
+#include <libyul/optimiser/CallGraphGenerator.h>
+#include <libyul/AsmData.h>
 
 #include <set>
 
-namespace yul
+namespace solidity::yul
 {
 struct Dialect;
 
@@ -35,46 +38,103 @@ struct Dialect;
 class SideEffectsCollector: public ASTWalker
 {
 public:
-	explicit SideEffectsCollector(Dialect const& _dialect): m_dialect(_dialect) {}
-	SideEffectsCollector(Dialect const& _dialect, Expression const& _expression);
+	explicit SideEffectsCollector(
+		Dialect const& _dialect,
+		std::map<YulString, SideEffects> const* _functionSideEffects = nullptr
+	): m_dialect(_dialect), m_functionSideEffects(_functionSideEffects) {}
+	SideEffectsCollector(
+		Dialect const& _dialect,
+		Expression const& _expression,
+		std::map<YulString, SideEffects> const* _functionSideEffects = nullptr
+	);
 	SideEffectsCollector(Dialect const& _dialect, Statement const& _statement);
-	SideEffectsCollector(Dialect const& _dialect, Block const& _ast);
+	SideEffectsCollector(
+		Dialect const& _dialect,
+		Block const& _ast,
+		std::map<YulString, SideEffects> const* _functionSideEffects = nullptr
+	);
 
 	using ASTWalker::operator();
-	void operator()(FunctionalInstruction const& _functionalInstruction) override;
 	void operator()(FunctionCall const& _functionCall) override;
 
-	bool movable() const { return m_movable; }
+	bool movable() const { return m_sideEffects.movable; }
 	bool sideEffectFree(bool _allowMSizeModification = false) const
 	{
 		if (_allowMSizeModification)
 			return sideEffectFreeIfNoMSize();
 		else
-			return m_sideEffectFree;
+			return m_sideEffects.sideEffectFree;
 	}
-	bool sideEffectFreeIfNoMSize() const { return m_sideEffectFreeIfNoMSize; }
-	bool containsMSize() const { return m_containsMSize; }
-	bool invalidatesStorage() const { return m_invalidatesStorage; }
-	bool invalidatesMemory() const { return m_invalidatesMemory; }
+	bool sideEffectFreeIfNoMSize() const { return m_sideEffects.sideEffectFreeIfNoMSize; }
+	bool invalidatesStorage() const { return m_sideEffects.invalidatesStorage; }
+	bool invalidatesMemory() const { return m_sideEffects.invalidatesMemory; }
 
 private:
 	Dialect const& m_dialect;
-	/// Is the current expression movable or not.
-	bool m_movable = true;
-	/// Is the current expression side-effect free, i.e. can be removed
-	/// without changing the semantics.
-	bool m_sideEffectFree = true;
-	/// Is the current expression side-effect free up to msize, i.e. can be removed
-	/// without changing the semantics except for the value returned by the msize instruction.
-	bool m_sideEffectFreeIfNoMSize = true;
-	/// Does the current code contain the MSize operation?
-	/// Note that this is a purely syntactic property meaning that even if this is false,
-	/// the code can still contain calls to functions that contain the msize instruction.
-	bool m_containsMSize = false;
-	/// If false, storage is guaranteed to be unchanged by the coded under all
-	/// circumstances.
-	bool m_invalidatesStorage = false;
-	bool m_invalidatesMemory = false;
+	std::map<YulString, SideEffects> const* m_functionSideEffects = nullptr;
+	SideEffects m_sideEffects;
+};
+
+/**
+ * This class can be used to determine the side-effects of user-defined functions.
+ *
+ * It is given a dialect and a mapping that represents the direct calls from user-defined
+ * functions to other user-defined functions and built-in functions.
+ */
+class SideEffectsPropagator
+{
+public:
+	static std::map<YulString, SideEffects> sideEffects(
+		Dialect const& _dialect,
+		CallGraph const& _directCallGraph
+	);
+};
+
+/**
+ * Class that can be used to find out if certain code contains the MSize instruction.
+ *
+ * Note that this is a purely syntactic property meaning that even if this is false,
+ * the code can still contain calls to functions that contain the msize instruction.
+ *
+ * The only safe way to determine this is by passing the full AST.
+ */
+class MSizeFinder: public ASTWalker
+{
+public:
+	static bool containsMSize(Dialect const& _dialect, Block const& _ast);
+
+	using ASTWalker::operator();
+	void operator()(FunctionCall const& _funCall);
+
+private:
+	MSizeFinder(Dialect const& _dialect): m_dialect(_dialect) {}
+	Dialect const& m_dialect;
+	bool m_msizeFound = false;
+};
+
+/**
+ * Class that can be used to find out if the given function contains the ``leave`` statement.
+ *
+ * Returns true even in the case where the function definition contains another function definition
+ * that contains the leave statement.
+ */
+class LeaveFinder: public ASTWalker
+{
+public:
+	static bool containsLeave(FunctionDefinition const& _fun)
+	{
+		LeaveFinder f;
+		f(_fun);
+		return f.m_leaveFound;
+	}
+
+	using ASTWalker::operator();
+	void operator()(Leave const&) { m_leaveFound = true; }
+
+private:
+	LeaveFinder() = default;
+
+	bool m_leaveFound = false;
 };
 
 /**
@@ -85,7 +145,10 @@ private:
 class MovableChecker: public SideEffectsCollector
 {
 public:
-	explicit MovableChecker(Dialect const& _dialect): SideEffectsCollector(_dialect) {}
+	explicit MovableChecker(
+		Dialect const& _dialect,
+		std::map<YulString, SideEffects> const* _functionSideEffects = nullptr
+	): SideEffectsCollector(_dialect, _functionSideEffects) {}
 	MovableChecker(Dialect const& _dialect, Expression const& _expression);
 
 	void operator()(Identifier const& _identifier) override;
@@ -109,12 +172,13 @@ private:
 class TerminationFinder
 {
 public:
-	enum class ControlFlow { FlowOut, Break, Continue, Terminate };
+	// TODO check all uses of TerminationFinder!
+	enum class ControlFlow { FlowOut, Break, Continue, Terminate, Leave };
 
 	TerminationFinder(Dialect const& _dialect): m_dialect(_dialect) {}
 
 	/// @returns the index of the first statement in the provided sequence
-	/// that is an unconditional ``break``, ``continue`` or a
+	/// that is an unconditional ``break``, ``continue``, ``leave`` or a
 	/// call to a terminating builtin function.
 	/// If control flow can continue at the end of the list,
 	/// returns `FlowOut` and ``size_t(-1)``.

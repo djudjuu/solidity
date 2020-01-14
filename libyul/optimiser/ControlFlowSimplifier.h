@@ -17,10 +17,12 @@
 #pragma once
 
 #include <libyul/optimiser/ASTWalker.h>
+#include <libyul/optimiser/OptimiserStep.h>
 
-namespace yul
+namespace solidity::yul
 {
 struct Dialect;
+struct OptimiserStepContext;
 
 /**
  * Simplifies several control-flow structures:
@@ -32,6 +34,7 @@ struct Dialect;
  * - replace switch with only default case with pop(expression) and body
  * - replace switch with const expr with matching case body
  * - replace ``for`` with terminating control flow and without other break/continue by ``if``
+ * - remove ``leave`` at the end of a function.
  *
  * None of these operations depend on the data flow. The StructuralSimplifier
  * performs similar tasks that do depend on data flow.
@@ -46,16 +49,20 @@ struct Dialect;
 class ControlFlowSimplifier: public ASTModifier
 {
 public:
-	ControlFlowSimplifier(Dialect const& _dialect): m_dialect(_dialect) {}
+	static constexpr char const* name{"ControlFlowSimplifier"};
+	static void run(OptimiserStepContext&, Block& _ast);
 
 	using ASTModifier::operator();
 	void operator()(Break&) override { ++m_numBreakStatements; }
 	void operator()(Continue&) override { ++m_numContinueStatements; }
 	void operator()(Block& _block) override;
+	void operator()(FunctionDefinition& _funDef) override;
 
 	void visit(Statement& _st) override;
 
 private:
+	ControlFlowSimplifier(Dialect const& _dialect): m_dialect(_dialect) {}
+
 	void simplify(std::vector<Statement>& _statements);
 
 	Dialect const& m_dialect;

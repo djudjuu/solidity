@@ -25,28 +25,28 @@
 #include <libsolidity/analysis/TypeChecker.h>
 #include <libsolidity/ast/AST.h>
 #include <liblangutil/ErrorReporter.h>
-#include <libdevcore/StringUtils.h>
+#include <libsolutil/StringUtils.h>
 #include <boost/algorithm/string.hpp>
 
 using namespace std;
-using namespace langutil;
+using namespace solidity::langutil;
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 NameAndTypeResolver::NameAndTypeResolver(
 	GlobalContext& _globalContext,
+	langutil::EVMVersion _evmVersion,
 	map<ASTNode const*, shared_ptr<DeclarationContainer>>& _scopes,
 	ErrorReporter& _errorReporter
-) :
+):
 	m_scopes(_scopes),
+	m_evmVersion(_evmVersion),
 	m_errorReporter(_errorReporter),
 	m_globalContext(_globalContext)
 {
 	if (!m_scopes[nullptr])
-		m_scopes[nullptr].reset(new DeclarationContainer());
+		m_scopes[nullptr] = make_shared<DeclarationContainer>();
 	for (Declaration const* declaration: _globalContext.declarations())
 	{
 		solAssert(m_scopes[nullptr]->registerDeclaration(*declaration), "Unable to register global declaration.");
@@ -91,13 +91,13 @@ bool NameAndTypeResolver::performImports(SourceUnit& _sourceUnit, map<string, So
 			if (!imp->symbolAliases().empty())
 				for (auto const& alias: imp->symbolAliases())
 				{
-					auto declarations = scope->second->resolveName(alias.first->name(), false);
+					auto declarations = scope->second->resolveName(alias.symbol->name(), false);
 					if (declarations.empty())
 					{
 						m_errorReporter.declarationError(
 							imp->location(),
 							"Declaration \"" +
-							alias.first->name() +
+							alias.symbol->name() +
 							"\" not found in \"" +
 							path +
 							"\" (referenced as \"" +
@@ -109,7 +109,7 @@ bool NameAndTypeResolver::performImports(SourceUnit& _sourceUnit, map<string, So
 					else
 						for (Declaration const* declaration: declarations)
 							if (!DeclarationRegistrationHelper::registerDeclaration(
-								target, *declaration, alias.second.get(), &imp->location(), true, false, m_errorReporter
+								target, *declaration, alias.alias.get(), &alias.location, true, false, m_errorReporter
 							))
 								error = true;
 				}
@@ -242,7 +242,7 @@ vector<Declaration const*> NameAndTypeResolver::cleanedDeclarations(
 
 void NameAndTypeResolver::warnVariablesNamedLikeInstructions()
 {
-	for (auto const& instruction: dev::eth::c_instructions)
+	for (auto const& instruction: evmasm::c_instructions)
 	{
 		string const instructionName{boost::algorithm::to_lower_copy(instruction.first)};
 		auto declarations = nameFromCurrentScope(instructionName, true);
@@ -324,7 +324,7 @@ bool NameAndTypeResolver::resolveNamesAndTypesInternal(ASTNode& _node, bool _res
 	{
 		if (m_scopes.count(&_node))
 			setScope(&_node);
-		return ReferencesResolver(m_errorReporter, *this, _resolveInsideCode).resolve(_node);
+		return ReferencesResolver(m_errorReporter, *this, m_evmVersion, _resolveInsideCode).resolve(_node);
 	}
 }
 
@@ -344,12 +344,20 @@ void NameAndTypeResolver::importInheritedScope(ContractDefinition const& _base)
 					solAssert(conflictingDeclaration, "");
 
 					// Usual shadowing is not an error
-					if (dynamic_cast<VariableDeclaration const*>(declaration) && dynamic_cast<VariableDeclaration const*>(conflictingDeclaration))
+					if (
+						dynamic_cast<ModifierDefinition const*>(declaration) &&
+						dynamic_cast<ModifierDefinition const*>(conflictingDeclaration)
+					)
 						continue;
 
-					// Usual shadowing is not an error
-					if (dynamic_cast<ModifierDefinition const*>(declaration) && dynamic_cast<ModifierDefinition const*>(conflictingDeclaration))
-						continue;
+					// Public state variable can override functions
+					if (auto varDecl = dynamic_cast<VariableDeclaration const*>(conflictingDeclaration))
+						if (
+							dynamic_cast<FunctionDefinition const*>(declaration) &&
+							varDecl->isStateVariable() &&
+							varDecl->isPublic()
+						)
+							continue;
 
 					if (declaration->location().start < conflictingDeclaration->location().start)
 					{
@@ -450,7 +458,7 @@ vector<_T const*> NameAndTypeResolver::cThreeMerge(list<list<_T const*>>& _toMer
 
 string NameAndTypeResolver::similarNameSuggestions(ASTString const& _name) const
 {
-	return quotedAlternativesList(m_currentScope->similarNames(_name));
+	return util::quotedAlternativesList(m_currentScope->similarNames(_name));
 }
 
 DeclarationRegistrationHelper::DeclarationRegistrationHelper(
@@ -523,7 +531,7 @@ bool DeclarationRegistrationHelper::registerDeclaration(
 	{
 		if (dynamic_cast<MagicVariableDeclaration const*>(shadowedDeclaration))
 			_errorReporter.warning(
-				_declaration.location(),
+				*_errorLocation,
 				"This declaration shadows a builtin symbol."
 			);
 		else
@@ -543,7 +551,7 @@ bool DeclarationRegistrationHelper::visit(SourceUnit& _sourceUnit)
 {
 	if (!m_scopes[&_sourceUnit])
 		// By importing, it is possible that the container already exists.
-		m_scopes[&_sourceUnit].reset(new DeclarationContainer(m_currentScope, m_scopes[m_currentScope].get()));
+		m_scopes[&_sourceUnit] = make_shared<DeclarationContainer>(m_currentScope, m_scopes[m_currentScope].get());
 	m_currentScope = &_sourceUnit;
 	return true;
 }
@@ -559,7 +567,7 @@ bool DeclarationRegistrationHelper::visit(ImportDirective& _import)
 	SourceUnit const* importee = _import.annotation().sourceUnit;
 	solAssert(!!importee, "");
 	if (!m_scopes[importee])
-		m_scopes[importee].reset(new DeclarationContainer(nullptr, m_scopes[nullptr].get()));
+		m_scopes[importee] = make_shared<DeclarationContainer>(nullptr, m_scopes[nullptr].get());
 	m_scopes[&_import] = m_scopes[importee];
 	registerDeclaration(_import, false);
 	return true;
@@ -570,6 +578,7 @@ bool DeclarationRegistrationHelper::visit(ContractDefinition& _contract)
 	m_globalContext.setCurrentContract(_contract);
 	m_scopes[nullptr]->registerDeclaration(*m_globalContext.currentThis(), nullptr, false, true);
 	m_scopes[nullptr]->registerDeclaration(*m_globalContext.currentSuper(), nullptr, false, true);
+	m_currentContract = &_contract;
 
 	registerDeclaration(_contract, true);
 	_contract.annotation().canonicalName = currentCanonicalName();
@@ -578,6 +587,7 @@ bool DeclarationRegistrationHelper::visit(ContractDefinition& _contract)
 
 void DeclarationRegistrationHelper::endVisit(ContractDefinition&)
 {
+	m_currentContract = nullptr;
 	closeCurrentScope();
 }
 
@@ -615,12 +625,25 @@ bool DeclarationRegistrationHelper::visit(FunctionDefinition& _function)
 {
 	registerDeclaration(_function, true);
 	m_currentFunction = &_function;
+	_function.annotation().contract = m_currentContract;
 	return true;
 }
 
 void DeclarationRegistrationHelper::endVisit(FunctionDefinition&)
 {
 	m_currentFunction = nullptr;
+	closeCurrentScope();
+}
+
+bool DeclarationRegistrationHelper::visit(TryCatchClause& _tryCatchClause)
+{
+	_tryCatchClause.annotation().scope = m_currentScope;
+	enterNewSubScope(_tryCatchClause);
+	return true;
+}
+
+void DeclarationRegistrationHelper::endVisit(TryCatchClause&)
+{
 	closeCurrentScope();
 }
 
@@ -650,7 +673,7 @@ void DeclarationRegistrationHelper::endVisit(FunctionTypeName&)
 
 bool DeclarationRegistrationHelper::visit(Block& _block)
 {
-	_block.setScope(m_currentScope);
+	_block.annotation().scope = m_currentScope;
 	enterNewSubScope(_block);
 	return true;
 }
@@ -662,7 +685,7 @@ void DeclarationRegistrationHelper::endVisit(Block&)
 
 bool DeclarationRegistrationHelper::visit(ForStatement& _for)
 {
-	_for.setScope(m_currentScope);
+	_for.annotation().scope = m_currentScope;
 	enterNewSubScope(_for);
 	return true;
 }
@@ -703,7 +726,7 @@ void DeclarationRegistrationHelper::enterNewSubScope(ASTNode& _subScope)
 {
 	map<ASTNode const*, shared_ptr<DeclarationContainer>>::iterator iter;
 	bool newlyAdded;
-	shared_ptr<DeclarationContainer> container(new DeclarationContainer(m_currentScope, m_scopes[m_currentScope].get()));
+	shared_ptr<DeclarationContainer> container{make_shared<DeclarationContainer>(m_currentScope, m_scopes[m_currentScope].get())};
 	tie(iter, newlyAdded) = m_scopes.emplace(&_subScope, move(container));
 	solAssert(newlyAdded, "Unable to add new scope.");
 	m_currentScope = &_subScope;
@@ -736,7 +759,7 @@ void DeclarationRegistrationHelper::registerDeclaration(Declaration& _declaratio
 
 	registerDeclaration(*m_scopes[m_currentScope], _declaration, nullptr, nullptr, warnAboutShadowing, inactive, m_errorReporter);
 
-	_declaration.setScope(m_currentScope);
+	_declaration.annotation().scope = m_currentScope;
 	if (_opensScope)
 		enterNewSubScope(_declaration);
 }
@@ -760,5 +783,4 @@ string DeclarationRegistrationHelper::currentCanonicalName() const
 	return ret;
 }
 
-}
 }

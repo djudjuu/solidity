@@ -33,19 +33,16 @@
 
 using namespace std;
 using namespace std::placeholders;
-using namespace dev::test;
+using namespace solidity::util;
+using namespace solidity::test;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 #define REQUIRE_LOG_DATA(DATA) do { \
-	BOOST_REQUIRE_EQUAL(m_logs.size(), 1); \
-	BOOST_CHECK_EQUAL(m_logs[0].address, m_contractAddress); \
-	ABI_CHECK(m_logs[0].data, DATA); \
+	BOOST_REQUIRE_EQUAL(numLogs(), 1); \
+	BOOST_CHECK_EQUAL(logAddress(0), m_contractAddress); \
+	ABI_CHECK(logData(0), DATA); \
 } while (false)
 
 BOOST_FIXTURE_TEST_SUITE(ABIEncoderTest, SolidityExecutionFramework)
@@ -168,7 +165,7 @@ BOOST_AUTO_TEST_CASE(memory_array_one_dim)
 		}
 	)";
 
-	if (!dev::test::Options::get().useABIEncoderV2)
+	if (!solidity::test::Options::get().useABIEncoderV2)
 	{
 		compileAndRun(sourceCode);
 		callContractFunction("f()");
@@ -343,7 +340,7 @@ BOOST_AUTO_TEST_CASE(external_function)
 	BOTH_ENCODERS(
 		compileAndRun(sourceCode);
 		callContractFunction("f(uint256)", u256(0));
-		string functionIdF = asString(m_contractAddress.ref()) + asString(FixedHash<4>(dev::keccak256("f(uint256)")).ref());
+		string functionIdF = asString(m_contractAddress.ref()) + asString(FixedHash<4>(keccak256("f(uint256)")).ref());
 		REQUIRE_LOG_DATA(encodeArgs(functionIdF, functionIdF));
 	)
 }
@@ -429,7 +426,9 @@ BOOST_AUTO_TEST_CASE(structs)
 				s.a = 8;
 				s.b = 9;
 				s.c = 10;
-				s.sub.length = 3;
+				s.sub.push();
+				s.sub.push();
+				s.sub.push();
 				s.sub[0].x[0] = 11;
 				s.sub[1].x[0] = 12;
 				s.sub[2].x[1] = 13;
@@ -451,7 +450,7 @@ BOOST_AUTO_TEST_CASE(structs)
 		);
 		BOOST_CHECK(callContractFunction("f()") == encoded);
 		REQUIRE_LOG_DATA(encoded);
-		BOOST_CHECK_EQUAL(m_logs[0].topics[0], dev::keccak256(string("e(uint16,(uint16,uint16,(uint64[2])[],uint16))")));
+		BOOST_CHECK_EQUAL(logTopic(0, 0), keccak256(string("e(uint16,(uint16,uint16,(uint64[2])[],uint16))")));
 	)
 }
 
@@ -522,11 +521,10 @@ BOOST_AUTO_TEST_CASE(bool_arrays)
 			bool[4] y;
 			event E(bool[], bool[4]);
 			function f() public returns (bool[] memory, bool[4] memory) {
-				x.length = 4;
-				x[0] = true;
-				x[1] = false;
-				x[2] = true;
-				x[3] = false;
+				x.push(true);
+				x.push(false);
+				x.push(true);
+				x.push(false);
 				y[0] = true;
 				y[1] = false;
 				y[2] = true;
@@ -556,11 +554,10 @@ BOOST_AUTO_TEST_CASE(bool_arrays_split)
 			bool[4] y;
 			event E(bool[], bool[4]);
 			function store() public {
-				x.length = 4;
-				x[0] = true;
-				x[1] = false;
-				x[2] = true;
-				x[3] = false;
+				x.push(true);
+				x.push(false);
+				x.push(true);
+				x.push(false);
 				y[0] = true;
 				y[1] = false;
 				y[2] = true;
@@ -594,9 +591,8 @@ BOOST_AUTO_TEST_CASE(bytesNN_arrays)
 			bytesWIDTH[SIZE] y;
 			event E(bytes8[], bytesWIDTH[SIZE]);
 			function store() public {
-				x.length = 2;
-				x[0] = "abc";
-				x[1] = "def";
+				x.push("abc");
+				x.push("def");
 				for (uint i = 0; i < y.length; i ++)
 					y[i] = bytesWIDTH(uintUINTWIDTH(i + 1));
 			}
@@ -640,9 +636,8 @@ BOOST_AUTO_TEST_CASE(bytesNN_arrays_dyn)
 			bytesWIDTH[] y;
 			event E(bytesWIDTH[], bytes8[]);
 			function store() public {
-				x.length = 2;
-				x[0] = "abc";
-				x[1] = "def";
+				x.push("abc");
+				x.push("def");
 				for (uint i = 0; i < SIZE; i ++)
 					y.push(bytesWIDTH(uintUINTWIDTH(i + 1)));
 			}
@@ -757,7 +752,7 @@ BOOST_AUTO_TEST_CASE(struct_in_constructor_indirect)
 			}
 		}
 	)";
-	if (dev::test::Options::get().evmVersion().supportsReturndata())
+	if (solidity::test::Options::get().evmVersion().supportsReturndata())
 	{
 		NEW_ENCODER(
 			compileAndRun(sourceCode, 0, "D");
@@ -789,6 +784,4 @@ BOOST_AUTO_TEST_CASE(struct_in_constructor_data_short)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

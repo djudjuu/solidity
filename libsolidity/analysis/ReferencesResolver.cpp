@@ -34,17 +34,15 @@
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/Exceptions.h>
 
-#include <libdevcore/StringUtils.h>
+#include <libsolutil/StringUtils.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 
 using namespace std;
-using namespace langutil;
+using namespace solidity::langutil;
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 bool ReferencesResolver::resolve(ASTNode const& _root)
@@ -122,11 +120,11 @@ bool ReferencesResolver::visit(ElementaryTypeName const& _typeName)
 	if (!_typeName.annotation().type)
 	{
 		_typeName.annotation().type = TypeProvider::fromElementaryTypeName(_typeName.typeName());
-		if (_typeName.stateMutability().is_initialized())
+		if (_typeName.stateMutability().has_value())
 		{
 			// for non-address types this was already caught by the parser
 			solAssert(_typeName.annotation().type->category() == Type::Category::Address, "");
-			switch(*_typeName.stateMutability())
+			switch (*_typeName.stateMutability())
 			{
 				case StateMutability::Payable:
 					_typeName.annotation().type = TypeProvider::payableAddress();
@@ -198,21 +196,21 @@ void ReferencesResolver::endVisit(FunctionTypeName const& _typeName)
 {
 	switch (_typeName.visibility())
 	{
-	case VariableDeclaration::Visibility::Internal:
-	case VariableDeclaration::Visibility::External:
+	case Visibility::Internal:
+	case Visibility::External:
 		break;
 	default:
 		fatalTypeError(_typeName.location(), "Invalid visibility, can only be \"external\" or \"internal\".");
 		return;
 	}
 
-	if (_typeName.isPayable() && _typeName.visibility() != VariableDeclaration::Visibility::External)
+	if (_typeName.isPayable() && _typeName.visibility() != Visibility::External)
 	{
 		fatalTypeError(_typeName.location(), "Only external function types can be payable.");
 		return;
 	}
 
-	if (_typeName.visibility() == VariableDeclaration::Visibility::External)
+	if (_typeName.visibility() == Visibility::External)
 		for (auto const& t: _typeName.parameterTypes() + _typeName.returnParameterTypes())
 		{
 			solAssert(t->annotation().type, "Type not set for parameter.");
@@ -279,10 +277,34 @@ bool ReferencesResolver::visit(InlineAssembly const& _inlineAssembly)
 	ErrorList errors;
 	ErrorReporter errorsIgnored(errors);
 	yul::ExternalIdentifierAccess::Resolver resolver =
-	[&](yul::Identifier const& _identifier, yul::IdentifierContext, bool _crossesFunctionBoundary) {
-		auto declarations = m_resolver.nameFromCurrentScope(_identifier.name.str());
+	[&](yul::Identifier const& _identifier, yul::IdentifierContext _context, bool _crossesFunctionBoundary) {
 		bool isSlot = boost::algorithm::ends_with(_identifier.name.str(), "_slot");
 		bool isOffset = boost::algorithm::ends_with(_identifier.name.str(), "_offset");
+		if (_context == yul::IdentifierContext::VariableDeclaration)
+		{
+			string namePrefix = _identifier.name.str().substr(0, _identifier.name.str().find('.'));
+			if (isSlot || isOffset)
+				declarationError(_identifier.location, "In variable declarations _slot and _offset can not be used as a suffix.");
+			else if (
+				auto declarations = m_resolver.nameFromCurrentScope(namePrefix);
+				!declarations.empty()
+			)
+			{
+				SecondarySourceLocation ssl;
+				for (auto const* decl: declarations)
+					ssl.append("The shadowed declaration is here:", decl->location());
+				if (!ssl.infos.empty())
+					declarationError(
+						_identifier.location,
+						ssl,
+						namePrefix.size() < _identifier.name.str().size() ?
+						"The prefix of this declaration conflicts with a declaration outside the inline assembly block." :
+						"This declaration shadows a declaration outside the inline assembly block."
+					);
+			}
+			return size_t(-1);
+		}
+		auto declarations = m_resolver.nameFromCurrentScope(_identifier.name.str());
 		if (isSlot || isOffset)
 		{
 			// special mode to access storage variables
@@ -323,12 +345,10 @@ bool ReferencesResolver::visit(InlineAssembly const& _inlineAssembly)
 	// Will be re-generated later with correct information
 	// We use the latest EVM version because we will re-run it anyway.
 	yul::AsmAnalysisInfo analysisInfo;
-	boost::optional<Error::Type> errorTypeForLoose = Error::Type::SyntaxError;
 	yul::AsmAnalyzer(
 		analysisInfo,
 		errorsIgnored,
-		errorTypeForLoose,
-		yul::EVMDialect::looseAssemblyForEVM(EVMVersion{}),
+		yul::EVMDialect::strictAssemblyForEVM(m_evmVersion),
 		resolver
 	).analyze(_inlineAssembly.operations());
 	return false;
@@ -383,12 +403,12 @@ void ReferencesResolver::endVisit(VariableDeclaration const& _variable)
 		else
 		{
 			errorString = "Data location must be " +
-			joinHumanReadable(
+			util::joinHumanReadable(
 				allowedDataLocations | boost::adaptors::transformed(locationToString),
 				", ",
 				" or "
 			);
-			if (_variable.isCallableParameter())
+			if (_variable.isCallableOrCatchParameter())
 				errorString +=
 					" for " +
 					string(_variable.isReturnParameter() ? "return " : "") +
@@ -466,11 +486,16 @@ void ReferencesResolver::declarationError(SourceLocation const& _location, strin
 	m_errorReporter.declarationError(_location, _description);
 }
 
+void ReferencesResolver::declarationError(SourceLocation const& _location, SecondarySourceLocation const& _ssl, string const& _description)
+{
+	m_errorOccurred = true;
+	m_errorReporter.declarationError(_location, _ssl, _description);
+}
+
 void ReferencesResolver::fatalDeclarationError(SourceLocation const& _location, string const& _description)
 {
 	m_errorOccurred = true;
 	m_errorReporter.fatalDeclarationError(_location, _description);
 }
 
-}
 }

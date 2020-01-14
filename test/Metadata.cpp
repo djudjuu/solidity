@@ -21,16 +21,14 @@
 
 #include <string>
 #include <iostream>
-#include <libdevcore/Assertions.h>
-#include <libdevcore/CommonData.h>
-#include <libdevcore/JSON.h>
+#include <libsolutil/Assertions.h>
+#include <libsolutil/CommonData.h>
+#include <libsolutil/JSON.h>
 #include <test/Metadata.h>
 
 using namespace std;
 
-namespace dev
-{
-namespace test
+namespace solidity::test
 {
 
 bytes onlyMetadata(bytes const& _bytecode)
@@ -41,9 +39,9 @@ bytes onlyMetadata(bytes const& _bytecode)
 	size_t metadataSize = (_bytecode[size - 2] << 8) + _bytecode[size - 1];
 	if (size < (metadataSize + 2))
 		return bytes{};
-	// Sanity check: assume the first byte is a fixed-size CBOR array with either 2 or 3 entries
+	// Sanity check: assume the first byte is a fixed-size CBOR array with 1, 2 or 3 entries
 	unsigned char firstByte = _bytecode[size - metadataSize - 2];
-	if (firstByte != 0xa2 && firstByte != 0xa3)
+	if (firstByte != 0xa1 && firstByte != 0xa2 && firstByte != 0xa3)
 		return bytes{};
 	return bytes(_bytecode.end() - metadataSize - 2, _bytecode.end() - 2);
 }
@@ -58,7 +56,7 @@ bytes bytecodeSansMetadata(bytes const& _bytecode)
 
 string bytecodeSansMetadata(string const& _bytecode)
 {
-	return toHex(bytecodeSansMetadata(fromHex(_bytecode, WhenError::Throw)));
+	return util::toHex(bytecodeSansMetadata(fromHex(_bytecode, util::WhenError::Throw)));
 }
 
 DEV_SIMPLE_EXCEPTION(CBORException);
@@ -84,7 +82,7 @@ public:
 		switch(nextType())
 		{
 			case MajorType::ByteString:
-				return toHex(readBytes(readLength()));
+				return util::toHex(readBytes(readLength()));
 			case MajorType::TextString:
 				return readString();
 			case MajorType::SimpleData:
@@ -150,7 +148,7 @@ private:
 	bytes const& m_metadata;
 };
 
-boost::optional<map<string, string>> parseCBORMetadata(bytes const& _metadata)
+std::optional<map<string, string>> parseCBORMetadata(bytes const& _metadata)
 {
 	try
 	{
@@ -174,7 +172,7 @@ boost::optional<map<string, string>> parseCBORMetadata(bytes const& _metadata)
 bool isValidMetadata(string const& _metadata)
 {
 	Json::Value metadata;
-	if (!jsonParseStrict(_metadata, metadata))
+	if (!util::jsonParseStrict(_metadata, metadata))
 		return false;
 
 	if (
@@ -185,7 +183,9 @@ bool isValidMetadata(string const& _metadata)
 		!metadata.isMember("settings") ||
 		!metadata.isMember("sources") ||
 		!metadata.isMember("output") ||
-		!metadata["settings"].isMember("evmVersion")
+		!metadata["settings"].isMember("evmVersion") ||
+		!metadata["settings"].isMember("metadata") ||
+		!metadata["settings"]["metadata"].isMember("bytecodeHash")
 	)
 		return false;
 
@@ -200,5 +200,4 @@ bool isValidMetadata(string const& _metadata)
 	return true;
 }
 
-}
 } // end namespaces

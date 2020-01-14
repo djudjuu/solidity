@@ -18,19 +18,20 @@
 #include <libyul/optimiser/VarDeclInitializer.h>
 #include <libyul/AsmData.h>
 
-#include <libdevcore/CommonData.h>
-#include <libdevcore/Visitor.h>
+#include <libsolutil/CommonData.h>
+#include <libsolutil/Visitor.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
 
 void VarDeclInitializer::operator()(Block& _block)
 {
 	ASTModifier::operator()(_block);
 
-	using OptionalStatements = boost::optional<vector<Statement>>;
-	GenericFallbackReturnsVisitor<OptionalStatements, VariableDeclaration> visitor{
+	using OptionalStatements = std::optional<vector<Statement>>;
+	util::GenericVisitor visitor{
+		util::VisitorFallback<OptionalStatements>{},
 		[](VariableDeclaration& _varDecl) -> OptionalStatements
 		{
 			if (_varDecl.value)
@@ -51,5 +52,6 @@ void VarDeclInitializer::operator()(Block& _block)
 			}
 		}
 	};
-	iterateReplacing(_block.statements, boost::apply_visitor(visitor));
+
+	util::iterateReplacing(_block.statements, [&](auto&& _statement) { return std::visit(visitor, _statement); });
 }

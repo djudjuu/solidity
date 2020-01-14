@@ -30,23 +30,20 @@
 #include <libsolidity/ast/ASTVisitor.h>
 
 using namespace std;
-using namespace langutil;
+using namespace solidity::langutil;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 namespace
 {
-ASTPointer<ContractDefinition> parseText(std::string const& _source, ErrorList& _errors)
+ASTPointer<ContractDefinition> parseText(std::string const& _source, ErrorList& _errors, bool errorRecovery = false)
 {
 	ErrorReporter errorReporter(_errors);
 	ASTPointer<SourceUnit> sourceUnit = Parser(
 		errorReporter,
-		dev::test::Options::get().evmVersion()
+		solidity::test::Options::get().evmVersion(),
+		errorRecovery
 	).parse(std::make_shared<Scanner>(CharStream(_source, "")));
 	if (!sourceUnit)
 		return ASTPointer<ContractDefinition>();
@@ -78,12 +75,12 @@ bool successParse(std::string const& _source)
 	return true;
 }
 
-Error getError(std::string const& _source)
+Error getError(std::string const& _source, bool errorRecovery = false)
 {
 	ErrorList errors;
 	try
 	{
-		parseText(_source, errors);
+		parseText(_source, errors, errorRecovery);
 	}
 	catch (FatalError const& /*_exception*/)
 	{
@@ -117,6 +114,14 @@ while(0)
 
 BOOST_AUTO_TEST_SUITE(SolidityParser)
 
+BOOST_AUTO_TEST_CASE(reserved_keywords)
+{
+	BOOST_CHECK(!TokenTraits::isReservedKeyword(Token::Identifier));
+	BOOST_CHECK(TokenTraits::isReservedKeyword(Token::After));
+	BOOST_CHECK(TokenTraits::isReservedKeyword(Token::Unchecked));
+	BOOST_CHECK(!TokenTraits::isReservedKeyword(Token::Illegal));
+}
+
 BOOST_AUTO_TEST_CASE(unsatisfied_version)
 {
 	char const* text = R"(
@@ -132,6 +137,18 @@ BOOST_AUTO_TEST_CASE(unsatisfied_version_followed_by_invalid_syntax)
 		this is surely invalid
 	)";
 	CHECK_PARSE_ERROR(text, "Source file requires different compiler version");
+}
+
+BOOST_AUTO_TEST_CASE(unsatisfied_version_with_recovery)
+{
+	char const* text = R"(
+		pragma solidity ^99.99.0;
+		contract test {
+			uint ;
+		}
+	)";
+	Error err = getError(text, true);
+	BOOST_CHECK(searchErrorMessage(err, "Expected identifier but got ';'"));
 }
 
 BOOST_AUTO_TEST_CASE(function_natspec_documentation)
@@ -511,7 +528,6 @@ BOOST_AUTO_TEST_CASE(multiple_visibility_specifiers)
 BOOST_AUTO_TEST_CASE(keyword_is_reserved)
 {
 	auto keywords = {
-		"abstract",
 		"after",
 		"alias",
 		"apply",
@@ -532,7 +548,6 @@ BOOST_AUTO_TEST_CASE(keyword_is_reserved)
 		"mutable",
 		"null",
 		"of",
-		"override",
 		"partial",
 		"promise",
 		"reference",
@@ -547,6 +562,8 @@ BOOST_AUTO_TEST_CASE(keyword_is_reserved)
 		"typeof",
 		"unchecked"
 	};
+
+	BOOST_CHECK_EQUAL(std::size(keywords), static_cast<int>(Token::Unchecked) - static_cast<int>(Token::After) + 1);
 
 	for (auto const& keyword: keywords)
 	{
@@ -673,6 +690,4 @@ BOOST_AUTO_TEST_CASE(inline_asm_end_location)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

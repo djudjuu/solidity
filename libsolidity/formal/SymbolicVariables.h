@@ -20,13 +20,10 @@
 #include <libsolidity/formal/SolverInterface.h>
 #include <libsolidity/formal/SSAVariable.h>
 #include <libsolidity/ast/Types.h>
+#include <libsolidity/ast/TypeProvider.h>
 #include <memory>
 
-namespace dev
-{
-namespace solidity
-{
-namespace smt
+namespace solidity::frontend::smt
 {
 
 class EncodingContext;
@@ -39,7 +36,8 @@ class SymbolicVariable
 {
 public:
 	SymbolicVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
+		frontend::TypePointer _originalType,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -51,10 +49,11 @@ public:
 
 	virtual ~SymbolicVariable() = default;
 
-	Expression currentValue() const;
+	virtual Expression currentValue(frontend::TypePointer const& _targetType = TypePointer{}) const;
 	std::string currentName() const;
 	virtual Expression valueAtIndex(int _index) const;
 	virtual std::string nameAtIndex(int _index) const;
+	virtual Expression resetIndex();
 	virtual Expression increaseIndex();
 	virtual Expression operator()(std::vector<Expression> /*_arguments*/) const
 	{
@@ -65,7 +64,8 @@ public:
 	unsigned& index() { return m_ssa->index(); }
 
 	SortPointer const& sort() const { return m_sort; }
-	solidity::TypePointer const& type() const { return m_type; }
+	frontend::TypePointer const& type() const { return m_type; }
+	frontend::TypePointer const& originalType() const { return m_originalType; }
 
 protected:
 	std::string uniqueSymbol(unsigned _index) const;
@@ -73,7 +73,9 @@ protected:
 	/// SMT sort.
 	SortPointer m_sort;
 	/// Solidity type, used for size and range in number types.
-	solidity::TypePointer m_type;
+	frontend::TypePointer m_type;
+	/// Solidity original type, used for type conversion if necessary.
+	frontend::TypePointer m_originalType;
 	std::string m_uniqueName;
 	EncodingContext& m_context;
 	std::unique_ptr<SSAVariable> m_ssa;
@@ -86,7 +88,7 @@ class SymbolicBoolVariable: public SymbolicVariable
 {
 public:
 	SymbolicBoolVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -99,7 +101,8 @@ class SymbolicIntVariable: public SymbolicVariable
 {
 public:
 	SymbolicIntVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
+		frontend::TypePointer _originalType,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -124,6 +127,7 @@ class SymbolicFixedBytesVariable: public SymbolicIntVariable
 {
 public:
 	SymbolicFixedBytesVariable(
+		frontend::TypePointer _originalType,
 		unsigned _numBytes,
 		std::string _uniqueName,
 		EncodingContext& _context
@@ -131,13 +135,18 @@ public:
 };
 
 /**
- * Specialization of SymbolicVariable for FunctionType
+ * Specialization of SymbolicVariable for FunctionType.
+ * Besides containing a symbolic function declaration,
+ * it also has an integer used as abstraction.
+ * By default, the abstract representation is used when
+ * values are requested, and the function declaration is
+ * used when operator() is applied over arguments.
  */
 class SymbolicFunctionVariable: public SymbolicVariable
 {
 public:
 	SymbolicFunctionVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -147,8 +156,20 @@ public:
 		EncodingContext& _context
 	);
 
-	Expression increaseIndex();
-	Expression operator()(std::vector<Expression> _arguments) const;
+	Expression currentValue(frontend::TypePointer const& _targetType = TypePointer{}) const override;
+
+	// Explicit request the function declaration.
+	Expression currentFunctionValue() const;
+
+	Expression valueAtIndex(int _index) const override;
+
+	// Explicit request the function declaration.
+	Expression functionValueAtIndex(int _index) const;
+
+	Expression resetIndex() override;
+	Expression increaseIndex() override;
+
+	Expression operator()(std::vector<Expression> _arguments) const override;
 
 private:
 	/// Creates a new function declaration.
@@ -156,6 +177,14 @@ private:
 
 	/// Stores the current function declaration.
 	Expression m_declaration;
+
+	/// Abstract representation.
+	SymbolicIntVariable m_abstract{
+		TypeProvider::uint256(),
+		TypeProvider::uint256(),
+		m_uniqueName + "_abstract",
+		m_context
+	};
 };
 
 /**
@@ -165,7 +194,7 @@ class SymbolicMappingVariable: public SymbolicVariable
 {
 public:
 	SymbolicMappingVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -178,10 +207,13 @@ class SymbolicArrayVariable: public SymbolicVariable
 {
 public:
 	SymbolicArrayVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
+		frontend::TypePointer _originalTtype,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
+
+	Expression currentValue(frontend::TypePointer const& _targetType = TypePointer{}) const override;
 };
 
 /**
@@ -191,7 +223,7 @@ class SymbolicEnumVariable: public SymbolicVariable
 {
 public:
 	SymbolicEnumVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -204,7 +236,7 @@ class SymbolicTupleVariable: public SymbolicVariable
 {
 public:
 	SymbolicTupleVariable(
-		solidity::TypePointer _type,
+		frontend::TypePointer _type,
 		std::string _uniqueName,
 		EncodingContext& _context
 	);
@@ -214,12 +246,8 @@ public:
 		return m_components;
 	}
 
-	void setComponents(std::vector<std::shared_ptr<SymbolicVariable>> _components);
-
 private:
 	std::vector<std::shared_ptr<SymbolicVariable>> m_components;
 };
 
-}
-}
 }

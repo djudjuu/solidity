@@ -16,30 +16,41 @@
 */
 
 #include <libyul/optimiser/ForLoopConditionIntoBody.h>
+#include <libyul/optimiser/OptimiserStep.h>
 #include <libyul/AsmData.h>
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonData.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+
+void ForLoopConditionIntoBody::run(OptimiserStepContext& _context, Block& _ast)
+{
+	ForLoopConditionIntoBody{_context.dialect}(_ast);
+}
 
 void ForLoopConditionIntoBody::operator()(ForLoop& _forLoop)
 {
-	if (_forLoop.condition->type() != typeid(Literal))
+	if (
+		m_dialect.booleanNegationFunction() &&
+		!holds_alternative<Literal>(*_forLoop.condition) &&
+		!holds_alternative<Identifier>(*_forLoop.condition)
+	)
 	{
-		langutil::SourceLocation loc = locationOf(*_forLoop.condition);
-		_forLoop.body.statements.insert(
-			_forLoop.body.statements.begin(),
+		langutil::SourceLocation const loc = locationOf(*_forLoop.condition);
+
+		_forLoop.body.statements.emplace(
+			begin(_forLoop.body.statements),
 			If {
 				loc,
 				make_unique<Expression>(
-					FunctionalInstruction {
+					FunctionCall {
 						loc,
-						eth::Instruction::ISZERO,
-						make_vector<Expression>(std::move(*_forLoop.condition))
+						{loc, m_dialect.booleanNegationFunction()->name},
+						util::make_vector<Expression>(std::move(*_forLoop.condition))
 					}
 				),
-				Block {loc, make_vector<Statement>(Break{{}})}
+				Block {loc, util::make_vector<Statement>(Break{{}})}
 			}
 		);
 		_forLoop.condition = make_unique<Expression>(

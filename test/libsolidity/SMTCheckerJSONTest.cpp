@@ -18,7 +18,8 @@
 #include <test/libsolidity/SMTCheckerJSONTest.h>
 #include <test/Options.h>
 #include <libsolidity/interface/StandardCompiler.h>
-#include <libdevcore/JSON.h>
+#include <libsolutil/CommonIO.h>
+#include <libsolutil/JSON.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -28,14 +29,15 @@
 #include <stdexcept>
 #include <sstream>
 
-using namespace dev::solidity::test;
-using namespace dev::solidity;
-using namespace dev::formatting;
-using namespace dev;
 using namespace std;
+using namespace solidity;
+using namespace solidity::frontend;
+using namespace solidity::frontend::test;
+using namespace solidity::util;
+using namespace solidity::util::formatting;
 using namespace boost::unit_test;
 
-SMTCheckerTest::SMTCheckerTest(string const& _filename, langutil::EVMVersion _evmVersion)
+SMTCheckerJSONTest::SMTCheckerJSONTest(string const& _filename, langutil::EVMVersion _evmVersion)
 : SyntaxTest(_filename, _evmVersion)
 {
 	if (!boost::algorithm::ends_with(_filename, ".sol"))
@@ -43,13 +45,13 @@ SMTCheckerTest::SMTCheckerTest(string const& _filename, langutil::EVMVersion _ev
 
 	string jsonFilename = _filename.substr(0, _filename.size() - 4) + ".json";
 	if (
-		!jsonParseFile(jsonFilename, m_smtResponses) ||
+		!jsonParseStrict(readFileAsString(jsonFilename), m_smtResponses) ||
 		!m_smtResponses.isObject()
 	)
 		BOOST_THROW_EXCEPTION(runtime_error("Invalid JSON file."));
 }
 
-TestCase::TestResult SMTCheckerTest::run(ostream& _stream, string const& _linePrefix, bool _formatted)
+TestCase::TestResult SMTCheckerJSONTest::run(ostream& _stream, string const& _linePrefix, bool _formatted)
 {
 	StandardCompiler compiler;
 
@@ -108,6 +110,9 @@ TestCase::TestResult SMTCheckerTest::run(ostream& _stream, string const& _linePr
 				BOOST_THROW_EXCEPTION(runtime_error("Error must have a SourceLocation with start and end."));
 			int start = location["start"].asInt();
 			int end = location["end"].asInt();
+			std::string sourceName;
+			if (location.isMember("source") && location["source"].isString())
+				sourceName = location["source"].asString();
 			if (start >= static_cast<int>(versionPragma.size()))
 				start -= versionPragma.size();
 			if (end >= static_cast<int>(versionPragma.size()))
@@ -115,6 +120,7 @@ TestCase::TestResult SMTCheckerTest::run(ostream& _stream, string const& _linePr
 			m_errorList.emplace_back(SyntaxTestError{
 				error["type"].asString(),
 				error["message"].asString(),
+				sourceName,
 				start,
 				end
 			});
@@ -124,7 +130,7 @@ TestCase::TestResult SMTCheckerTest::run(ostream& _stream, string const& _linePr
 	return printExpectationAndError(_stream, _linePrefix, _formatted) ? TestResult::Success : TestResult::Failure;
 }
 
-vector<string> SMTCheckerTest::hashesFromJson(Json::Value const& _jsonObj, string const& _auxInput, string const& _smtlib)
+vector<string> SMTCheckerJSONTest::hashesFromJson(Json::Value const& _jsonObj, string const& _auxInput, string const& _smtlib)
 {
 	vector<string> hashes;
 	Json::Value const& auxInputs = _jsonObj[_auxInput];
@@ -138,16 +144,23 @@ vector<string> SMTCheckerTest::hashesFromJson(Json::Value const& _jsonObj, strin
 	return hashes;
 }
 
-Json::Value SMTCheckerTest::buildJson(string const& _extra)
+Json::Value SMTCheckerJSONTest::buildJson(string const& _extra)
 {
 	string language = "\"language\": \"Solidity\"";
-	string sourceName = "\"A\"";
-	string sourceContent = "\"" + _extra + m_source + "\"";
-	string sourceObj = "{ \"content\": " + sourceContent + "}";
-	string sources = " \"sources\": { " + sourceName + ": " + sourceObj + "}";
+	string sources = " \"sources\": { ";
+	bool first = true;
+	for (auto [sourceName, sourceContent]: m_sources)
+	{
+		string sourceObj = "{ \"content\": \"" + _extra + sourceContent + "\"}";
+		if (!first)
+			sources += ", ";
+		sources += "\"" + sourceName + "\": " + sourceObj;
+		first = false;
+	}
+	sources += "}";
 	string input = "{" + language + ", " + sources + "}";
 	Json::Value source;
-	if (!jsonParse(input, source))
-		BOOST_THROW_EXCEPTION(runtime_error("Could not build JSON from string."));
+	if (!jsonParseStrict(input, source))
+		BOOST_THROW_EXCEPTION(runtime_error("Could not build JSON from string: " + input));
 	return source;
 }

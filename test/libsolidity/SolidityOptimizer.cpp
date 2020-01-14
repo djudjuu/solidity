@@ -33,14 +33,11 @@
 #include <memory>
 
 using namespace std;
-using namespace dev::eth;
-using namespace dev::test;
+using namespace solidity::util;
+using namespace solidity::evmasm;
+using namespace solidity::test;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 class OptimizerTestFramework: public SolidityExecutionFramework
@@ -104,12 +101,12 @@ public:
 
 	/// @returns the number of instructions in the given bytecode, not taking the metadata hash
 	/// into account.
-	size_t numInstructions(bytes const& _bytecode, boost::optional<Instruction> _which = boost::optional<Instruction>{})
+	size_t numInstructions(bytes const& _bytecode, std::optional<Instruction> _which = std::optional<Instruction>{})
 	{
 		bytes realCode = bytecodeSansMetadata(_bytecode);
 		BOOST_REQUIRE_MESSAGE(!realCode.empty(), "Invalid or missing metadata in bytecode.");
 		size_t instructions = 0;
-		dev::eth::eachInstruction(realCode, [&](Instruction _instr, u256 const&) {
+		evmasm::eachInstruction(realCode, [&](Instruction _instr, u256 const&) {
 			if (!_which || *_which == _instr)
 				instructions++;
 		});
@@ -206,7 +203,8 @@ BOOST_AUTO_TEST_CASE(array_copy)
 			bytes2[] data1;
 			bytes5[] data2;
 			function f(uint x) public returns (uint l, uint y) {
-				data1.length = msg.data.length;
+				for (uint i = 0; i < msg.data.length; i++)
+					data1.push();
 				for (uint i = 0; i < msg.data.length; ++i)
 					data1[i] = msg.data[i];
 				data2 = data1;
@@ -485,7 +483,18 @@ BOOST_AUTO_TEST_CASE(constant_optimization_early_exit)
 	auto start = std::chrono::steady_clock::now();
 	compileBothVersions(sourceCode);
 	double duration = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-	BOOST_CHECK_MESSAGE(duration < 20, "Compilation of constants took longer than 20 seconds.");
+	// Since run time on an ASan build is not really realistic, we disable this test for those builds.
+	size_t maxDuration = 20;
+#if !defined(__SANITIZE_ADDRESS__) && defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define __SANITIZE_ADDRESS__ 1
+#endif
+#endif
+#if __SANITIZE_ADDRESS__
+	maxDuration = size_t(-1);
+	BOOST_TEST_MESSAGE("Disabled constant optimizer run time check for address sanitizer build.");
+#endif
+	BOOST_CHECK_MESSAGE(duration <= maxDuration, "Compilation of constants took longer than 20 seconds.");
 	compareVersions("hexEncodeTest(address)", u256(0x123456789));
 }
 
@@ -522,16 +531,15 @@ BOOST_AUTO_TEST_CASE(inconsistency)
 			}
 
 			function trigger() public returns (uint) {
-				containers.length++;
-				Container storage container = containers[0];
+				Container storage container = containers.push();
 
 				container.values.push(Value({
 					badnum: 9000,
 					number: 0
 				}));
 
-				container.valueIndices.length++;
-				valueIndices.length++;
+				container.valueIndices.push();
+				valueIndices.push();
 
 				levelII();
 				return debug;
@@ -703,6 +711,4 @@ BOOST_AUTO_TEST_CASE(shift_optimizer_bug)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

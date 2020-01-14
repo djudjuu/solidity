@@ -16,13 +16,9 @@
 
 #include <test/libsolidity/util/SoltestTypes.h>
 
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonData.h>
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 /**
@@ -32,69 +28,100 @@ namespace test
 class BytesUtils
 {
 public:
+	/// Left-aligns and pads given _bytes and returns a new
+	/// bytes array.
+	static bytes alignLeft(bytes _bytes);
+
+	/// Right-aligns and pads given _bytes and returns a new
+	/// bytes array.
+	static bytes alignRight(bytes _bytes);
+
+	/// Applies given _alignment to _bytes and returns a new
+	/// bytes array.
+	/// TODO: Remove abiType reference from parameter list
+	/// and return the new alignment instead.
+	static bytes applyAlign(
+		Parameter::Alignment _alignment,
+		ABIType& _abiType,
+		bytes _bytes
+	);
+
 	/// Tries to convert \param _literal to an unpadded `bytes`
 	/// representation of the boolean number literal. Throws if conversion fails.
-	bytes convertBoolean(std::string const& _literal);
+	static bytes convertBoolean(std::string const& _literal);
 
 	/// Tries to convert \param _literal to an unpadded `bytes`
 	/// representation of the decimal number literal. Throws if conversion fails.
-	bytes convertNumber(std::string const& _literal);
+	static bytes convertNumber(std::string const& _literal);
 
 	/// Tries to convert \param _literal to an unpadded `bytes`
 	/// representation of the hex literal. Throws if conversion fails.
-	bytes convertHexNumber(std::string const& _literal);
+	static bytes convertHexNumber(std::string const& _literal);
 
 	/// Tries to convert \param _literal to an unpadded `bytes`
 	/// representation of the string literal. Throws if conversion fails.
-	bytes convertString(std::string const& _literal);
+	static bytes convertString(std::string const& _literal);
 
 	/// Converts \param _bytes to a soltest-compliant and human-readable
 	/// string representation of a byte array which is assumed to hold
 	/// an unsigned value.
-	std::string formatUnsigned(bytes const& _bytes) const;
+	static std::string formatUnsigned(bytes const& _bytes);
 
 	/// Converts \param _bytes to a soltest-compliant and human-readable
 	/// string representation of a byte array which is assumed to hold
 	/// a signed value.
-	std::string formatSigned(bytes const& _bytes) const;
+	static std::string formatSigned(bytes const& _bytes);
 
 	/// Converts \param _bytes to a soltest-compliant and human-readable
 	/// string representation of a byte array which is assumed to hold
 	/// a boolean value.
-	std::string formatBoolean(bytes const& _bytes) const;
+	static std::string formatBoolean(bytes const& _bytes);
 
 	/// Converts \param _bytes to a soltest-compliant and human-readable
 	/// string representation of a byte array which is assumed to hold
 	/// a hex value.
-	std::string formatHex(bytes const& _bytes) const;
+	static std::string formatHex(bytes const& _bytes);
 
 	/// Converts \param _bytes to a soltest-compliant and human-readable
 	/// string representation of a byte array which is assumed to hold
 	/// a hexString value.
-	std::string formatHexString(bytes const& _bytes) const;
+	static std::string formatHexString(bytes const& _bytes);
 
 	/// Converts \param _bytes to a soltest-compliant and human-readable
 	/// string representation of a byte array which is assumed to hold
 	/// a string value.
-	std::string formatString(bytes const& _bytes) const;
+	static std::string formatString(bytes const& _bytes, size_t _cutOff);
 
-	/// Left-aligns and pads given _bytes and returns a new
-	/// bytes array.
-	bytes alignLeft(bytes _bytes) const;
+	static std::string formatString(bytes const& _bytes)
+	{
+		return formatString(_bytes, _bytes.size());
+	}
 
-	/// Right-aligns and pads given _bytes and returns a new
-	/// bytes array.
-	bytes alignRight(bytes _bytes) const;
+	/// Used to print returned bytes from function calls to the commandline.
+	/// Returns a string representation of given _bytes in ranges of 32 bytes.
+	/// If _withSignature is true, the first 4 bytes will be formatted separately.
+	static std::string formatRawBytes(
+		bytes const& _bytes,
+		ParameterList const& _parameters,
+		std::string _linePrefix = ""
+	);
 
-	/// Applies given _alignment to _bytes and returns a new
-	/// bytes array.
-	bytes applyAlign(
-		Parameter::Alignment _alignment,
-		ABIType& _abiType,
-		bytes _bytes
-	) const;
+	/// Formats given _bytes with type information passed in _abiType.
+	static std::string formatBytes(bytes const& _bytes, ABIType const& _abiType);
+
+	/// Formats given _bytes with type information passed in _abiTypes.
+	/// Prints obtained result if it does not match the expectation
+	/// and prints the expected result otherwise.
+	/// Highlights parameter only if it does not match.
+	static std::string formatBytesRange(
+		bytes _bytes,
+		ParameterList const& _parameters,
+		bool _highlight
+	);
+
+	/// Count the number of zeros between the last non-zero byte and the end of
+	/// \param _bytes.
+	static size_t countRightPaddedZeros(bytes const& _bytes);
 };
 
-}
-}
 }

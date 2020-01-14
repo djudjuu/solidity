@@ -23,7 +23,7 @@
 #include <libyul/optimiser/ASTWalker.h>
 #include <liblangutil/EVMVersion.h>
 
-namespace yul
+namespace solidity::yul
 {
 
 struct Dialect;
@@ -81,13 +81,12 @@ private:
 	CodeCost(Dialect const& _dialect): m_dialect(_dialect) {}
 
 	void operator()(FunctionCall const& _funCall) override;
-	void operator()(FunctionalInstruction const& _instr) override;
 	void operator()(Literal const& _literal) override;
 	void visit(Statement const& _statement) override;
 	void visit(Expression const& _expression) override;
 
 private:
-	void addInstructionCost(dev::eth::Instruction _instruction);
+	void addInstructionCost(evmasm::Instruction _instruction);
 
 	Dialect const& m_dialect;
 	size_t m_cost = 0;

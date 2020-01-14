@@ -24,8 +24,8 @@
 
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
 
 void NameDisplacer::operator()(Identifier& _identifier)
 {
@@ -64,8 +64,8 @@ void NameDisplacer::operator()(Block& _block)
 	// First replace all the names of function definitions
 	// because of scoping.
 	for (auto& st: _block.statements)
-		if (st.type() == typeid(FunctionDefinition))
-			checkAndReplaceNew(boost::get<FunctionDefinition>(st).name);
+		if (holds_alternative<FunctionDefinition>(st))
+			checkAndReplaceNew(std::get<FunctionDefinition>(st).name);
 
 	ASTModifier::operator()(_block);
 }

@@ -32,17 +32,18 @@
 
 #include <liblangutil/SourceLocation.h>
 
-#include <libdevcore/FixedHash.h>
+#include <libsolutil/FixedHash.h>
 
 #include <memory>
 #include <functional>
 
 using namespace std;
-using namespace dev;
-using namespace langutil;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
+using namespace solidity::langutil;
 
-EthAssemblyAdapter::EthAssemblyAdapter(eth::Assembly& _assembly):
+EthAssemblyAdapter::EthAssemblyAdapter(evmasm::Assembly& _assembly):
 	m_assembly(_assembly)
 {
 }
@@ -62,7 +63,7 @@ void EthAssemblyAdapter::setStackHeight(int height)
 	m_assembly.setDeposit(height);
 }
 
-void EthAssemblyAdapter::appendInstruction(dev::eth::Instruction _instruction)
+void EthAssemblyAdapter::appendInstruction(evmasm::Instruction _instruction)
 {
 	m_assembly.append(_instruction);
 }
@@ -74,12 +75,12 @@ void EthAssemblyAdapter::appendConstant(u256 const& _constant)
 
 void EthAssemblyAdapter::appendLabel(LabelID _labelId)
 {
-	m_assembly.append(eth::AssemblyItem(eth::Tag, _labelId));
+	m_assembly.append(evmasm::AssemblyItem(evmasm::Tag, _labelId));
 }
 
 void EthAssemblyAdapter::appendLabelReference(LabelID _labelId)
 {
-	m_assembly.append(eth::AssemblyItem(eth::PushTag, _labelId));
+	m_assembly.append(evmasm::AssemblyItem(evmasm::PushTag, _labelId));
 }
 
 size_t EthAssemblyAdapter::newLabelId()
@@ -99,7 +100,7 @@ void EthAssemblyAdapter::appendLinkerSymbol(std::string const& _linkerSymbol)
 
 void EthAssemblyAdapter::appendJump(int _stackDiffAfter)
 {
-	appendInstruction(dev::eth::Instruction::JUMP);
+	appendInstruction(evmasm::Instruction::JUMP);
 	m_assembly.adjustDeposit(_stackDiffAfter);
 }
 
@@ -112,25 +113,25 @@ void EthAssemblyAdapter::appendJumpTo(LabelID _labelId, int _stackDiffAfter)
 void EthAssemblyAdapter::appendJumpToIf(LabelID _labelId)
 {
 	appendLabelReference(_labelId);
-	appendInstruction(dev::eth::Instruction::JUMPI);
+	appendInstruction(evmasm::Instruction::JUMPI);
 }
 
 void EthAssemblyAdapter::appendBeginsub(LabelID, int)
 {
 	// TODO we could emulate that, though
-	solAssert(false, "BEGINSUB not implemented for EVM 1.0");
+	yulAssert(false, "BEGINSUB not implemented for EVM 1.0");
 }
 
 void EthAssemblyAdapter::appendJumpsub(LabelID, int, int)
 {
 	// TODO we could emulate that, though
-	solAssert(false, "JUMPSUB not implemented for EVM 1.0");
+	yulAssert(false, "JUMPSUB not implemented for EVM 1.0");
 }
 
 void EthAssemblyAdapter::appendReturnsub(int, int)
 {
 	// TODO we could emulate that, though
-	solAssert(false, "RETURNSUB not implemented for EVM 1.0");
+	yulAssert(false, "RETURNSUB not implemented for EVM 1.0");
 }
 
 void EthAssemblyAdapter::appendAssemblySize()
@@ -140,7 +141,7 @@ void EthAssemblyAdapter::appendAssemblySize()
 
 pair<shared_ptr<AbstractAssembly>, AbstractAssembly::SubID> EthAssemblyAdapter::createSubAssembly()
 {
-	shared_ptr<eth::Assembly> assembly{make_shared<eth::Assembly>()};
+	shared_ptr<evmasm::Assembly> assembly{make_shared<evmasm::Assembly>()};
 	auto sub = m_assembly.newSub(assembly);
 	return {make_shared<EthAssemblyAdapter>(*assembly), size_t(sub.data())};
 }
@@ -151,7 +152,7 @@ void EthAssemblyAdapter::appendDataOffset(AbstractAssembly::SubID _sub)
 	if (it == m_dataHashBySubId.end())
 		m_assembly.pushSubroutineOffset(size_t(_sub));
 	else
-		m_assembly << eth::AssemblyItem(eth::PushData, it->second);
+		m_assembly << evmasm::AssemblyItem(evmasm::PushData, it->second);
 }
 
 void EthAssemblyAdapter::appendDataSize(AbstractAssembly::SubID _sub)
@@ -165,23 +166,23 @@ void EthAssemblyAdapter::appendDataSize(AbstractAssembly::SubID _sub)
 
 AbstractAssembly::SubID EthAssemblyAdapter::appendData(bytes const& _data)
 {
-	eth::AssemblyItem pushData = m_assembly.newData(_data);
+	evmasm::AssemblyItem pushData = m_assembly.newData(_data);
 	SubID subID = m_nextDataCounter++;
 	m_dataHashBySubId[subID] = pushData.data();
 	return subID;
 }
 
-EthAssemblyAdapter::LabelID EthAssemblyAdapter::assemblyTagToIdentifier(eth::AssemblyItem const& _tag)
+EthAssemblyAdapter::LabelID EthAssemblyAdapter::assemblyTagToIdentifier(evmasm::AssemblyItem const& _tag)
 {
 	u256 id = _tag.data();
-	solAssert(id <= std::numeric_limits<LabelID>::max(), "Tag id too large.");
+	yulAssert(id <= std::numeric_limits<LabelID>::max(), "Tag id too large.");
 	return LabelID(id);
 }
 
 void CodeGenerator::assemble(
 	Block const& _parsedData,
 	AsmAnalysisInfo& _analysisInfo,
-	eth::Assembly& _assembly,
+	evmasm::Assembly& _assembly,
 	langutil::EVMVersion _evmVersion,
 	ExternalIdentifierAccess const& _identifierAccess,
 	bool _useNamedLabelsForFunctions,
@@ -207,11 +208,11 @@ void CodeGenerator::assemble(
 	}
 	catch (StackTooDeepError const& _e)
 	{
-		BOOST_THROW_EXCEPTION(
-			InternalCompilerError() << errinfo_comment(
-				"Stack too deep when compiling inline assembly" +
-				(_e.comment() ? ": " + *_e.comment() : ".")
-			));
+		yulAssert(
+			false,
+			"Stack too deep when compiling inline assembly" +
+			(_e.comment() ? ": " + *_e.comment() : ".")
+		);
 	}
-	solAssert(transform.stackErrors().empty(), "Stack errors present but not thrown.");
+	yulAssert(transform.stackErrors().empty(), "Stack errors present but not thrown.");
 }

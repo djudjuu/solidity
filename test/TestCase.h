@@ -28,20 +28,8 @@
 #include <vector>
 #include <map>
 
-namespace dev
+namespace solidity::frontend::test
 {
-namespace solidity
-{
-namespace test
-{
-
-#define soltestAssert(CONDITION, DESCRIPTION) \
-	do \
-	{ \
-		if (!(CONDITION)) \
-			BOOST_THROW_EXCEPTION(runtime_error(DESCRIPTION)); \
-	} \
-	while (false)
 
 /**
  * Common superclass of anything that can be run via isoltest.
@@ -52,7 +40,6 @@ public:
 	struct Config
 	{
 		std::string filename;
-		std::string ipcPath;
 		langutil::EVMVersion evmVersion;
 	};
 
@@ -89,6 +76,9 @@ public:
 	virtual bool validateSettings(langutil::EVMVersion /*_evmVersion*/);
 
 protected:
+	std::pair<std::map<std::string, std::string>, std::size_t> parseSourcesAndSettingsWithLineNumbers(std::istream& _file);
+	std::map<std::string, std::string> parseSourcesAndSettings(std::istream& _file);
+	std::pair<std::string, std::size_t> parseSourceAndSettingsWithLineNumbers(std::istream& _file);
 	std::string parseSourceAndSettings(std::istream& _file);
 	static void expect(std::string::iterator& _it, std::string::iterator _end, std::string::value_type _c);
 
@@ -120,6 +110,5 @@ public:
 	/// Returns true, if the test case is supported for EVM version @arg _evmVersion, false otherwise.
 	bool validateSettings(langutil::EVMVersion _evmVersion) override;
 };
-}
-}
+
 }

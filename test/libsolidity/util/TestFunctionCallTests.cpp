@@ -25,13 +25,10 @@
 #include <test/libsolidity/util/TestFunctionCall.h>
 
 using namespace std;
-using namespace dev::test;
+using namespace solidity::util;
+using namespace solidity::test;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 BOOST_AUTO_TEST_SUITE(TestFunctionCallTest)
@@ -44,6 +41,8 @@ BOOST_AUTO_TEST_CASE(format_unsigned_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(uint8)", 0, arguments, expectations};
+	call.omitsArrow = false;
+
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(uint8): 1 -> 1");
@@ -62,6 +61,8 @@ BOOST_AUTO_TEST_CASE(format_unsigned_singleline_signed_encoding)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(uint8)", 0, arguments, expectations};
+	call.omitsArrow = false;
+
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(uint8): 1 -> 1");
@@ -80,6 +81,7 @@ BOOST_AUTO_TEST_CASE(format_unsigned_multiline)
 	FunctionCallExpectations expectations{vector<Parameter>{result}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{}, string{}};
 	FunctionCall call{"f(uint8)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	call.displayMode = FunctionCall::DisplayMode::MultiLine;
 	TestFunctionCall test{call};
 
@@ -94,6 +96,7 @@ BOOST_AUTO_TEST_CASE(format_multiple_unsigned_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param, param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param, param}, string{}};
 	FunctionCall call{"f(uint8, uint8)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(uint8, uint8): 1, 1 -> 1, 1");
@@ -107,6 +110,7 @@ BOOST_AUTO_TEST_CASE(format_signed_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(int8)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(int8): -1 -> -1");
@@ -126,12 +130,14 @@ BOOST_AUTO_TEST_CASE(format_hex_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(bytes32)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(bytes32): 0x31 -> 0x31");
 
 	bytes actualResult = fromHex("0x32");
-	bytes actualBytes = actualResult + bytes(32 - actualResult.size(), 0);
+	bytes actualBytes = bytes(32 - actualResult.size(), 0) + actualResult;
+
 	test.setRawBytes(actualBytes);
 	test.setFailure(false);
 
@@ -146,6 +152,7 @@ BOOST_AUTO_TEST_CASE(format_hex_string_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(string)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(string): hex\"4200ef\" -> hex\"4200ef\"");
@@ -159,6 +166,7 @@ BOOST_AUTO_TEST_CASE(format_bool_true_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(bool)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(bool): true -> true");
@@ -179,6 +187,7 @@ BOOST_AUTO_TEST_CASE(format_bool_false_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(bool)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(bool): false -> false");
@@ -192,6 +201,7 @@ BOOST_AUTO_TEST_CASE(format_bool_left_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(bool)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(bool): left(false) -> left(false)");
@@ -206,6 +216,7 @@ BOOST_AUTO_TEST_CASE(format_hex_number_right_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(bool)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(bool): right(0x42) -> right(0x42)");
@@ -219,6 +230,7 @@ BOOST_AUTO_TEST_CASE(format_empty_byte_range)
 	FunctionCallExpectations expectations{vector<Parameter>{param}, false, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{}, string{}};
 	FunctionCall call{"f()", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f() -> 1");
@@ -232,6 +244,7 @@ BOOST_AUTO_TEST_CASE(format_failure_singleline)
 	FunctionCallExpectations expectations{vector<Parameter>{}, true, string{}};
 	FunctionCallArgs arguments{vector<Parameter>{param}, string{}};
 	FunctionCall call{"f(uint8)", 0, arguments, expectations};
+	call.omitsArrow = false;
 	TestFunctionCall test{call};
 
 	BOOST_REQUIRE_EQUAL(test.format(), "// f(uint8): 1 -> FAILURE");
@@ -239,6 +252,4 @@ BOOST_AUTO_TEST_CASE(format_failure_singleline)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 }

@@ -24,13 +24,22 @@
 #include <libyul/optimiser/Semantics.h>
 #include <libyul/AsmData.h>
 
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonData.h>
 
 #include <boost/range/algorithm_ext/erase.hpp>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+
+void RedundantAssignEliminator::run(OptimiserStepContext& _context, Block& _ast)
+{
+	RedundantAssignEliminator rae{_context.dialect};
+	rae(_ast);
+
+	AssignmentRemover remover{rae.m_pendingRemovals};
+	remover(_ast);
+}
 
 void RedundantAssignEliminator::operator()(Identifier const& _identifier)
 {
@@ -95,11 +104,16 @@ void RedundantAssignEliminator::operator()(Switch const& _switch)
 void RedundantAssignEliminator::operator()(FunctionDefinition const& _functionDefinition)
 {
 	std::set<YulString> outerDeclaredVariables;
+	std::set<YulString> outerReturnVariables;
 	TrackedAssignments outerAssignments;
 	ForLoopInfo forLoopInfo;
 	swap(m_declaredVariables, outerDeclaredVariables);
+	swap(m_returnVariables, outerReturnVariables);
 	swap(m_assignments, outerAssignments);
 	swap(m_forLoopInfo, forLoopInfo);
+
+	for (auto const& retParam: _functionDefinition.returnVariables)
+		m_returnVariables.insert(retParam.name);
 
 	(*this)(_functionDefinition.body);
 
@@ -109,6 +123,7 @@ void RedundantAssignEliminator::operator()(FunctionDefinition const& _functionDe
 		finalize(retParam.name, State::Used);
 
 	swap(m_declaredVariables, outerDeclaredVariables);
+	swap(m_returnVariables, outerReturnVariables);
 	swap(m_assignments, outerAssignments);
 	swap(m_forLoopInfo, forLoopInfo);
 }
@@ -191,6 +206,12 @@ void RedundantAssignEliminator::operator()(Continue const&)
 	m_assignments.clear();
 }
 
+void RedundantAssignEliminator::operator()(Leave const&)
+{
+	for (YulString name: m_returnVariables)
+		changeUndecidedTo(name, State::Used);
+}
+
 void RedundantAssignEliminator::operator()(Block const& _block)
 {
 	set<YulString> outerDeclaredVariables;
@@ -204,14 +225,6 @@ void RedundantAssignEliminator::operator()(Block const& _block)
 	swap(m_declaredVariables, outerDeclaredVariables);
 }
 
-void RedundantAssignEliminator::run(Dialect const& _dialect, Block& _ast)
-{
-	RedundantAssignEliminator rae{_dialect};
-	rae(_ast);
-
-	AssignmentRemover remover{rae.m_pendingRemovals};
-	remover(_ast);
-}
 
 template <class K, class V, class F>
 void joinMap(std::map<K, V>& _a, std::map<K, V>&& _b, F _conflictSolver)
@@ -267,35 +280,34 @@ void RedundantAssignEliminator::changeUndecidedTo(YulString _variable, Redundant
 
 void RedundantAssignEliminator::finalize(YulString _variable, RedundantAssignEliminator::State _finalState)
 {
-	finalize(m_assignments, _variable, _finalState);
-	for (auto& assignments: m_forLoopInfo.pendingBreakStmts)
-		finalize(assignments, _variable, _finalState);
-	for (auto& assignments: m_forLoopInfo.pendingContinueStmts)
-		finalize(assignments, _variable, _finalState);
-}
+	std::map<Assignment const*, State> assignments;
+	joinMap(assignments, std::move(m_assignments[_variable]), State::join);
+	m_assignments.erase(_variable);
 
-void RedundantAssignEliminator::finalize(
-	TrackedAssignments& _assignments,
-	YulString _variable,
-	RedundantAssignEliminator::State _finalState
-)
-{
-	for (auto const& assignment: _assignments[_variable])
+	for (auto& breakAssignments: m_forLoopInfo.pendingBreakStmts)
+	{
+		joinMap(assignments, std::move(breakAssignments[_variable]), State::join);
+		breakAssignments.erase(_variable);
+	}
+	for (auto& continueAssignments: m_forLoopInfo.pendingContinueStmts)
+	{
+		joinMap(assignments, std::move(continueAssignments[_variable]), State::join);
+		continueAssignments.erase(_variable);
+	}
+
+	for (auto const& assignment: assignments)
 	{
 		State const state = assignment.second == State::Undecided ? _finalState : assignment.second;
 
 		if (state == State::Unused && SideEffectsCollector{*m_dialect, *assignment.first->value}.movable())
-			// TODO the only point where we actually need this
-			// to be a set is for the for loop
 			m_pendingRemovals.insert(assignment.first);
 	}
-	_assignments.erase(_variable);
 }
 
 void AssignmentRemover::operator()(Block& _block)
 {
 	boost::range::remove_erase_if(_block.statements, [=](Statement const& _statement) -> bool {
-		return _statement.type() == typeid(Assignment) && m_toRemove.count(&boost::get<Assignment>(_statement));
+		return holds_alternative<Assignment>(_statement) && m_toRemove.count(&std::get<Assignment>(_statement));
 	});
 
 	ASTModifier::operator()(_block);

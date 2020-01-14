@@ -14,7 +14,7 @@
 
 #pragma once
 
-namespace langutil
+namespace solidity::langutil
 {
 
 inline bool isDecimalDigit(char c)
@@ -28,11 +28,6 @@ inline bool isHexDigit(char c)
 		isDecimalDigit(c) ||
 		('a' <= c && c <= 'f') ||
 		('A' <= c && c <= 'F');
-}
-
-inline bool isLineTerminator(char c)
-{
-	return c == '\n';
 }
 
 inline bool isWhiteSpace(char c)

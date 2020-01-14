@@ -19,19 +19,16 @@
  */
 
 #include <test/libsolidity/AnalysisFramework.h>
+#include <test/Options.h>
 
 #include <boost/test/unit_test.hpp>
 
 #include <string>
 
 using namespace std;
-using namespace langutil;
+using namespace solidity::langutil;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 class SMTCheckerFramework: public AnalysisFramework
@@ -58,198 +55,89 @@ protected:
 
 BOOST_FIXTURE_TEST_SUITE(SMTChecker, SMTCheckerFramework)
 
-BOOST_AUTO_TEST_CASE(division)
+BOOST_AUTO_TEST_CASE(import_base)
 {
-	string text = R"(
-		contract C {
-			function f(uint x, uint y) public pure returns (uint) {
-				return x / y;
+	CompilerStack c;
+	c.setSources({
+	{"base", R"(
+		pragma solidity >=0.0;
+		contract Base {
+			uint x;
+			address a;
+			function f() internal returns (uint) {
+				a = address(this);
+				++x;
+				return 2;
 			}
 		}
-	)";
-	CHECK_WARNING(text, "Division by zero");
-	text = R"(
-		contract C {
-			function f(uint x, uint y) public pure returns (uint) {
-				require(y != 0);
-				return x / y;
+	)"},
+	{"der", R"(
+		pragma solidity >=0.0;
+		pragma experimental SMTChecker;
+		import "base";
+		contract Der is Base {
+			function g(uint y) public {
+				x += f();
+				assert(y > x);
 			}
 		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function f(int x, int y) public pure returns (int) {
-				require(y != 0);
-				return x / y;
-			}
-		}
-	)";
-	CHECK_WARNING(text, "Overflow");
-	text = R"(
-		contract C {
-			function f(int x, int y) public pure returns (int) {
-				require(y != 0);
-				require(y != -1);
-				return x / y;
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-				uint256 c;
-				if (a != 0) {
-					c = a * b;
-					require(c / a == b);
-				}
-				return c;
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-				if (a == 0) {
-					return 0;
-				}
-				uint256 c = a * b;
-				require(c / a == b);
-				return c;
-			}
-		}
-	)";
-	CHECK_WARNING(text, "Division by zero");
-	text = R"(
-		contract C {
-			function div(uint256 a, uint256 b) internal pure returns (uint256) {
-				require(b > 0);
-				uint256 c = a / b;
-				return c;
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
+	)"}
+	});
+	c.setEVMVersion(solidity::test::Options::get().evmVersion());
+	BOOST_CHECK(c.compile());
 
+	unsigned asserts = 0;
+	for (auto const& e: c.errors())
+	{
+		string const* msg = e->comment();
+		BOOST_REQUIRE(msg);
+		if (msg->find("Assertion violation") != string::npos)
+			++asserts;
+	}
+	BOOST_CHECK_EQUAL(asserts, 1);
+}
+
+BOOST_AUTO_TEST_CASE(import_library)
+{
+	CompilerStack c;
+	c.setSources({
+	{"lib", R"(
+		pragma solidity >=0.0;
+		library L {
+			uint constant one = 1;
+			function f() internal pure returns (uint) {
+				return one;
+			}
+		}
+	)"},
+	{"c", R"(
+		pragma solidity >=0.0;
+		pragma experimental SMTChecker;
+		import "lib";
+		contract C {
+			function g(uint x) public pure {
+				uint y = L.f();
+				assert(x > y);
+			}
+		}
+	)"}
+	});
+	c.setEVMVersion(solidity::test::Options::get().evmVersion());
+	BOOST_CHECK(c.compile());
+
+	unsigned asserts = 0;
+	for (auto const& e: c.errors())
+	{
+		string const* msg = e->comment();
+		BOOST_REQUIRE(msg);
+		if (msg->find("Assertion violation") != string::npos)
+			++asserts;
+	}
+	BOOST_CHECK_EQUAL(asserts, 1);
 
 }
 
-BOOST_AUTO_TEST_CASE(division_truncates_correctly)
-{
-	string text = R"(
-		contract C {
-			function f(uint x, uint y) public pure {
-				x = 7;
-				y = 2;
-				assert(x / y == 3);
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function f(int x, int y) public pure {
-				x = 7;
-				y = 2;
-				assert(x / y == 3);
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function f(int x, int y) public pure {
-				x = -7;
-				y = 2;
-				assert(x / y == -3);
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function f(int x, int y) public pure {
-				x = 7;
-				y = -2;
-				assert(x / y == -3);
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-	text = R"(
-		contract C {
-			function f(int x, int y) public pure {
-				x = -7;
-				y = -2;
-				assert(x / y == 3);
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-}
-
-BOOST_AUTO_TEST_CASE(compound_assignment_division)
-{
-	string text = R"(
-		contract C {
-			function f(uint x) public pure {
-				require(x == 2);
-				uint y = 10;
-				y /= y / x;
-				assert(y == x);
-				assert(y == 0);
-			}
-		}
-	)";
-	CHECK_WARNING(text, "Assertion violation");
-	text = R"(
-		contract C {
-			uint[] array;
-			function f(uint x, uint p) public {
-				require(x == 2);
-				require(array[p] == 10);
-				array[p] /= array[p] / x;
-				assert(array[p] == x);
-				assert(array[p] == 0);
-			}
-		}
-	)";
-	CHECK_WARNING(text, "Assertion violation");
-	text = R"(
-		contract C {
-			mapping (uint => uint) map;
-			function f(uint x, uint p) public {
-				require(x == 2);
-				require(map[p] == 10);
-				map[p] /= map[p] / x;
-				assert(map[p] == x);
-				assert(map[p] == 0);
-			}
-		}
-	)";
-	CHECK_WARNING(text, "Assertion violation");
-}
-
-BOOST_AUTO_TEST_CASE(mod)
-{
-	string text = R"(
-		contract C {
-			function f(int x, int y) public pure {
-				require(y == -10);
-				require(x == 100);
-				int z1 = x % y;
-				int z2 = x % -y;
-				assert(z1 == z2);
-			}
-		}
-	)";
-	CHECK_SUCCESS_NO_WARNINGS(text);
-}
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 }

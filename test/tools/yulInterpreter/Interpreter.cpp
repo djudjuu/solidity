@@ -21,25 +21,30 @@
 #include <test/tools/yulInterpreter/Interpreter.h>
 
 #include <test/tools/yulInterpreter/EVMInstructionInterpreter.h>
+#include <test/tools/yulInterpreter/EwasmBuiltinInterpreter.h>
 
 #include <libyul/AsmData.h>
 #include <libyul/Dialect.h>
 #include <libyul/Utilities.h>
 #include <libyul/backends/evm/EVMDialect.h>
+#include <libyul/backends/wasm/WasmDialect.h>
 
 #include <liblangutil/Exceptions.h>
 
-#include <libdevcore/FixedHash.h>
+#include <libsolutil/FixedHash.h>
 
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/algorithm/cxx11/all_of.hpp>
 
 #include <ostream>
+#include <variant>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
-using namespace yul::test;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::yul::test;
+
+using solidity::util::h256;
 
 void InterpreterState::dumpTraceAndState(ostream& _out) const
 {
@@ -47,13 +52,12 @@ void InterpreterState::dumpTraceAndState(ostream& _out) const
 	for (auto const& line: trace)
 		_out << "  " << line << endl;
 	_out << "Memory dump:\n";
-	for (size_t i = 0; i < memory.size(); i += 0x20)
-	{
-		bytesConstRef data(memory.data() + i, 0x20);
-		if (boost::algorithm::all_of_equal(data, 0))
-			continue;
-		_out << "  " << std::hex << std::setw(4) << i << ": " << toHex(data.toBytes()) << endl;
-	}
+	map<u256, u256> words;
+	for (auto const& [offset, value]: memory)
+		words[(offset / 0x20) * 0x20] |= u256(uint32_t(value)) << (256 - 8 - 8 * size_t(offset % 0x20));
+	for (auto const& [offset, value]: words)
+		if (value != 0)
+			_out << "  " << std::uppercase << std::hex << std::setw(4) << offset << ": " << h256(value).hex() << endl;
 	_out << "Storage dump:" << endl;
 	for (auto const& slot: storage)
 		if (slot.second != h256(0))
@@ -90,7 +94,8 @@ void Interpreter::operator()(VariableDeclaration const& _declaration)
 		YulString varName = _declaration.variables.at(i).name;
 		solAssert(!m_variables.count(varName), "");
 		m_variables[varName] = values.at(i);
-		m_scopes.back().insert(varName);
+		solAssert(!m_scopes.back().count(varName), "");
+		m_scopes.back().emplace(varName, nullptr);
 	}
 }
 
@@ -124,30 +129,43 @@ void Interpreter::operator()(ForLoop const& _forLoop)
 	solAssert(_forLoop.condition, "");
 
 	openScope();
+	ScopeGuard g([this]{ closeScope(); });
+
 	for (auto const& statement: _forLoop.pre.statements)
+	{
 		visit(statement);
+		if (m_state.controlFlowState == ControlFlowState::Leave)
+			return;
+	}
 	while (evaluate(*_forLoop.condition) != 0)
 	{
-		m_state.loopState = LoopState::Default;
+		m_state.controlFlowState = ControlFlowState::Default;
 		(*this)(_forLoop.body);
-		if (m_state.loopState == LoopState::Break)
+		if (m_state.controlFlowState == ControlFlowState::Break || m_state.controlFlowState == ControlFlowState::Leave)
 			break;
 
-		m_state.loopState = LoopState::Default;
+		m_state.controlFlowState = ControlFlowState::Default;
 		(*this)(_forLoop.post);
+		if (m_state.controlFlowState == ControlFlowState::Leave)
+			break;
 	}
-	m_state.loopState = LoopState::Default;
-	closeScope();
+	if (m_state.controlFlowState != ControlFlowState::Leave)
+		m_state.controlFlowState = ControlFlowState::Default;
 }
 
 void Interpreter::operator()(Break const&)
 {
-	m_state.loopState = LoopState::Break;
+	m_state.controlFlowState = ControlFlowState::Break;
 }
 
 void Interpreter::operator()(Continue const&)
 {
-	m_state.loopState = LoopState::Continue;
+	m_state.controlFlowState = ControlFlowState::Continue;
+}
+
+void Interpreter::operator()(Leave const&)
+{
+	m_state.controlFlowState = ControlFlowState::Leave;
 }
 
 void Interpreter::operator()(Block const& _block)
@@ -161,17 +179,17 @@ void Interpreter::operator()(Block const& _block)
 	openScope();
 	// Register functions.
 	for (auto const& statement: _block.statements)
-		if (statement.type() == typeid(FunctionDefinition))
+		if (holds_alternative<FunctionDefinition>(statement))
 		{
-			FunctionDefinition const& funDef = boost::get<FunctionDefinition>(statement);
-			m_functions[funDef.name] = &funDef;
-			m_scopes.back().insert(funDef.name);
+			FunctionDefinition const& funDef = std::get<FunctionDefinition>(statement);
+			solAssert(!m_scopes.back().count(funDef.name), "");
+			m_scopes.back().emplace(funDef.name, &funDef);
 		}
 
 	for (auto const& statement: _block.statements)
 	{
 		visit(statement);
-		if (m_state.loopState != LoopState::Default)
+		if (m_state.controlFlowState != ControlFlowState::Default)
 			break;
 	}
 
@@ -180,25 +198,23 @@ void Interpreter::operator()(Block const& _block)
 
 u256 Interpreter::evaluate(Expression const& _expression)
 {
-	ExpressionEvaluator ev(m_state, m_dialect, m_variables, m_functions);
+	ExpressionEvaluator ev(m_state, m_dialect, m_variables, m_scopes);
 	ev.visit(_expression);
 	return ev.value();
 }
 
 vector<u256> Interpreter::evaluateMulti(Expression const& _expression)
 {
-	ExpressionEvaluator ev(m_state, m_dialect, m_variables, m_functions);
+	ExpressionEvaluator ev(m_state, m_dialect, m_variables, m_scopes);
 	ev.visit(_expression);
 	return ev.values();
 }
 
 void Interpreter::closeScope()
 {
-	for (auto const& var: m_scopes.back())
-	{
-		size_t erased = m_variables.erase(var) + m_functions.erase(var);
-		solAssert(erased == 1, "");
-	}
+	for (auto const& [var, funDeclaration]: m_scopes.back())
+		if (!funDeclaration)
+			solAssert(m_variables.erase(var) == 1, "");
 	m_scopes.pop_back();
 }
 
@@ -216,43 +232,44 @@ void ExpressionEvaluator::operator()(Identifier const& _identifier)
 	setValue(m_variables.at(_identifier.name));
 }
 
-void ExpressionEvaluator::operator()(FunctionalInstruction const& _instr)
-{
-	evaluateArgs(_instr.arguments);
-	EVMInstructionInterpreter interpreter(m_state);
-	// The instruction might also return nothing, but it does not
-	// hurt to set the value in that case.
-	setValue(interpreter.eval(_instr.instruction, values()));
-}
-
 void ExpressionEvaluator::operator()(FunctionCall const& _funCall)
 {
 	evaluateArgs(_funCall.arguments);
 
 	if (EVMDialect const* dialect = dynamic_cast<EVMDialect const*>(&m_dialect))
+	{
 		if (BuiltinFunctionForEVM const* fun = dialect->builtin(_funCall.functionName.name))
 		{
 			EVMInstructionInterpreter interpreter(m_state);
 			setValue(interpreter.evalBuiltin(*fun, values()));
 			return;
 		}
+	}
+	else if (WasmDialect const* dialect = dynamic_cast<WasmDialect const*>(&m_dialect))
+		if (dialect->builtin(_funCall.functionName.name))
+		{
+			EwasmBuiltinInterpreter interpreter(m_state);
+			setValue(interpreter.evalBuiltin(_funCall.functionName.name, values()));
+			return;
+		}
 
-	solAssert(m_functions.count(_funCall.functionName.name), "");
-	FunctionDefinition const& fun = *m_functions.at(_funCall.functionName.name);
-	solAssert(m_values.size() == fun.parameters.size(), "");
+	auto [functionScopes, fun] = findFunctionAndScope(_funCall.functionName.name);
+
+	solAssert(fun, "Function not found.");
+	solAssert(m_values.size() == fun->parameters.size(), "");
 	map<YulString, u256> variables;
-	for (size_t i = 0; i < fun.parameters.size(); ++i)
-		variables[fun.parameters.at(i).name] = m_values.at(i);
-	for (size_t i = 0; i < fun.returnVariables.size(); ++i)
-		variables[fun.returnVariables.at(i).name] = 0;
+	for (size_t i = 0; i < fun->parameters.size(); ++i)
+		variables[fun->parameters.at(i).name] = m_values.at(i);
+	for (size_t i = 0; i < fun->returnVariables.size(); ++i)
+		variables[fun->returnVariables.at(i).name] = 0;
 
-	// TODO function name lookup could be a little more efficient,
-	// we have to copy the list here.
-	Interpreter interpreter(m_state, m_dialect, variables, m_functions);
-	interpreter(fun.body);
+	m_state.controlFlowState = ControlFlowState::Default;
+	Interpreter interpreter(m_state, m_dialect, variables, functionScopes);
+	interpreter(fun->body);
+	m_state.controlFlowState = ControlFlowState::Default;
 
 	m_values.clear();
-	for (auto const& retVar: fun.returnVariables)
+	for (auto const& retVar: fun->returnVariables)
 		m_values.emplace_back(interpreter.valueOfVariable(retVar.name));
 }
 
@@ -279,4 +296,28 @@ void ExpressionEvaluator::evaluateArgs(vector<Expression> const& _expr)
 	}
 	m_values = std::move(values);
 	std::reverse(m_values.begin(), m_values.end());
+}
+
+pair<
+	vector<map<YulString, FunctionDefinition const*>>,
+	FunctionDefinition const*
+> ExpressionEvaluator::findFunctionAndScope(YulString _functionName) const
+{
+	FunctionDefinition const* fun = nullptr;
+	std::vector<std::map<YulString, FunctionDefinition const*>> newScopes;
+	for (auto const& scope: m_scopes)
+	{
+		// Copy over all functions.
+		newScopes.push_back({});
+		for (auto const& [name, funDef]: scope)
+			if (funDef)
+				newScopes.back().emplace(name, funDef);
+		// Stop at the called function.
+		if (scope.count(_functionName))
+		{
+			fun = scope.at(_functionName);
+			break;
+		}
+	}
+	return {move(newScopes), fun};
 }

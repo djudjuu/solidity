@@ -33,8 +33,8 @@
 #include <libyul/AsmData.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
 
 namespace
 {
@@ -70,7 +70,7 @@ public:
 		{
 			YulString varName = _varDecl.variables.front().name;
 			if (m_value.count(varName))
-				m_expressionCodeCost[varName] = CodeCost::codeCost(m_dialect, *m_value[varName]);
+				m_expressionCodeCost[varName] = CodeCost::codeCost(m_dialect, *m_value[varName].value);
 		}
 	}
 
@@ -85,9 +85,9 @@ public:
 	// get called on left-hand-sides of assignments.
 	void visit(Expression& _e) override
 	{
-		if (_e.type() == typeid(Identifier))
+		if (holds_alternative<Identifier>(_e))
 		{
-			YulString name = boost::get<Identifier>(_e).name;
+			YulString name = std::get<Identifier>(_e).name;
 			if (m_expressionCodeCost.count(name))
 			{
 				if (!m_value.count(name))
@@ -155,19 +155,20 @@ void eliminateVariables(
 
 bool StackCompressor::run(
 	Dialect const& _dialect,
-	Block& _ast,
+	Object& _object,
 	bool _optimizeStackAllocation,
 	size_t _maxIterations
 )
 {
 	yulAssert(
-		_ast.statements.size() > 0 && _ast.statements.at(0).type() == typeid(Block),
+		_object.code &&
+		_object.code->statements.size() > 0 && holds_alternative<Block>(_object.code->statements.at(0)),
 		"Need to run the function grouper before the stack compressor."
 	);
-	bool allowMSizeOptimzation = !SideEffectsCollector(_dialect, _ast).containsMSize();
+	bool allowMSizeOptimzation = !MSizeFinder::containsMSize(_dialect, *_object.code);
 	for (size_t iterations = 0; iterations < _maxIterations; iterations++)
 	{
-		map<YulString, int> stackSurplus = CompilabilityChecker::run(_dialect, _ast, _optimizeStackAllocation);
+		map<YulString, int> stackSurplus = CompilabilityChecker::run(_dialect, _object, _optimizeStackAllocation);
 		if (stackSurplus.empty())
 			return true;
 
@@ -176,15 +177,15 @@ bool StackCompressor::run(
 			yulAssert(stackSurplus.at({}) > 0, "Invalid surplus value.");
 			eliminateVariables(
 				_dialect,
-				boost::get<Block>(_ast.statements.at(0)),
+				std::get<Block>(_object.code->statements.at(0)),
 				stackSurplus.at({}),
 				allowMSizeOptimzation
 			);
 		}
 
-		for (size_t i = 1; i < _ast.statements.size(); ++i)
+		for (size_t i = 1; i < _object.code->statements.size(); ++i)
 		{
-			FunctionDefinition& fun = boost::get<FunctionDefinition>(_ast.statements[i]);
+			FunctionDefinition& fun = std::get<FunctionDefinition>(_object.code->statements[i]);
 			if (!stackSurplus.count(fun.name))
 				continue;
 

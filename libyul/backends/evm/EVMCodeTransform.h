@@ -27,17 +27,15 @@
 #include <libyul/AsmDataForward.h>
 #include <libyul/AsmScope.h>
 
-#include <boost/variant.hpp>
-#include <boost/optional.hpp>
-
+#include <optional>
 #include <stack>
 
-namespace langutil
+namespace solidity::langutil
 {
 class ErrorReporter;
 }
 
-namespace yul
+namespace solidity::yul
 {
 struct AsmAnalysisInfo;
 class EVMAssembly;
@@ -73,6 +71,7 @@ struct CodeTransformContext
 	};
 
 	std::stack<ForLoopLabels> forLoopStack;
+	std::stack<JumpInfo> functionExitPoints;
 };
 
 /**
@@ -107,7 +106,7 @@ private:
 	Scope* m_scope = nullptr;
 };
 
-class CodeTransform: public boost::static_visitor<>
+class CodeTransform
 {
 public:
 	/// Create the code transformer.
@@ -171,14 +170,10 @@ protected:
 	void deleteVariable(Scope::Variable const& _var);
 
 public:
-	void operator()(Instruction const& _instruction);
 	void operator()(Literal const& _literal);
 	void operator()(Identifier const& _identifier);
-	void operator()(FunctionalInstruction const& _instr);
 	void operator()(FunctionCall const&);
 	void operator()(ExpressionStatement const& _statement);
-	void operator()(Label const& _label);
-	void operator()(StackAssignment const& _assignment);
 	void operator()(Assignment const& _assignment);
 	void operator()(VariableDeclaration const& _varDecl);
 	void operator()(If const& _if);
@@ -187,6 +182,7 @@ public:
 	void operator()(ForLoop const&);
 	void operator()(Break const&);
 	void operator()(Continue const&);
+	void operator()(Leave const&);
 	void operator()(Block const& _block);
 
 private:

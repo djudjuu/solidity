@@ -18,19 +18,17 @@
 #include <libsolidity/formal/Z3Interface.h>
 
 #include <liblangutil/Exceptions.h>
-#include <libdevcore/CommonIO.h>
+#include <libsolutil/CommonIO.h>
 
 using namespace std;
-using namespace dev;
-using namespace dev::solidity::smt;
+using namespace solidity::frontend::smt;
 
 Z3Interface::Z3Interface():
 	m_solver(m_context)
 {
-	// This needs to be set globally.
+	// These need to be set globally.
 	z3::set_param("rewriter.pull_cheap_ite", true);
-	// This needs to be set in the context.
-	m_context.set("timeout", queryTimeout);
+	z3::set_param("rlimit", resourceLimit);
 }
 
 void Z3Interface::reset()
@@ -50,22 +48,25 @@ void Z3Interface::pop()
 	m_solver.pop();
 }
 
-void Z3Interface::declareVariable(string const& _name, Sort const& _sort)
+void Z3Interface::declareVariable(string const& _name, SortPointer const& _sort)
 {
-	if (_sort.kind == Kind::Function)
-		declareFunction(_name, _sort);
-	else if (!m_constants.count(_name))
-		m_constants.insert({_name, m_context.constant(_name.c_str(), z3Sort(_sort))});
+	solAssert(_sort, "");
+	if (_sort->kind == Kind::Function)
+		declareFunction(_name, *_sort);
+	else if (m_constants.count(_name))
+		m_constants.at(_name) = m_context.constant(_name.c_str(), z3Sort(*_sort));
+	else
+		m_constants.emplace(_name, m_context.constant(_name.c_str(), z3Sort(*_sort)));
 }
 
 void Z3Interface::declareFunction(string const& _name, Sort const& _sort)
 {
 	solAssert(_sort.kind == smt::Kind::Function, "");
-	if (!m_functions.count(_name))
-	{
-		FunctionSort fSort = dynamic_cast<FunctionSort const&>(_sort);
-		m_functions.insert({_name, m_context.function(_name.c_str(), z3Sort(fSort.domain), z3Sort(*fSort.codomain))});
-	}
+	FunctionSort fSort = dynamic_cast<FunctionSort const&>(_sort);
+	if (m_functions.count(_name))
+		m_functions.at(_name) = m_context.function(_name.c_str(), z3Sort(fSort.domain), z3Sort(*fSort.codomain));
+	else
+		m_functions.emplace(_name, m_context.function(_name.c_str(), z3Sort(fSort.domain), z3Sort(*fSort.codomain)));
 }
 
 void Z3Interface::addAssertion(Expression const& _expr)
@@ -96,7 +97,7 @@ pair<CheckResult, vector<string>> Z3Interface::check(vector<Expression> const& _
 		{
 			z3::model m = m_solver.get_model();
 			for (Expression const& e: _expressionsToEvaluate)
-				values.push_back(toString(m.eval(toZ3Expr(e))));
+				values.push_back(util::toString(m.eval(toZ3Expr(e))));
 		}
 	}
 	catch (z3::exception const&)
@@ -132,6 +133,12 @@ z3::expr Z3Interface::toZ3Expr(Expression const& _expr)
 				return m_context.bool_val(true);
 			else if (n == "false")
 				return m_context.bool_val(false);
+			else if (_expr.sort->kind == Kind::Sort)
+			{
+				auto sortSort = dynamic_pointer_cast<SortSort>(_expr.sort);
+				solAssert(sortSort, "");
+				return m_context.constant(n.c_str(), z3Sort(*sortSort->inner));
+			}
 			else
 				try
 				{
@@ -178,6 +185,14 @@ z3::expr Z3Interface::toZ3Expr(Expression const& _expr)
 			return z3::select(arguments[0], arguments[1]);
 		else if (n == "store")
 			return z3::store(arguments[0], arguments[1], arguments[2]);
+		else if (n == "const_array")
+		{
+			shared_ptr<SortSort> sortSort = std::dynamic_pointer_cast<SortSort>(_expr.arguments[0].sort);
+			solAssert(sortSort, "");
+			auto arraySort = dynamic_pointer_cast<ArraySort>(sortSort->inner);
+			solAssert(arraySort && arraySort->domain, "");
+			return z3::const_array(z3Sort(*arraySort->domain), arguments[1]);
+		}
 
 		solAssert(false, "");
 	}

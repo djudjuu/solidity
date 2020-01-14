@@ -26,11 +26,14 @@
 #include <string>
 #include <vector>
 
-// Forward-declare all AST node types
+// Forward-declare all AST node types and related enums.
 
-namespace dev
+namespace solidity::langutil
 {
-namespace solidity
+enum class Token : unsigned int;
+}
+
+namespace solidity::frontend
 {
 
 class ASTNode;
@@ -39,6 +42,7 @@ class PragmaDirective;
 class ImportDirective;
 class Declaration;
 class CallableDeclaration;
+class OverrideSpecifier;
 class ContractDefinition;
 class InheritanceSpecifier;
 class UsingForDirective;
@@ -63,6 +67,8 @@ class Statement;
 class Block;
 class PlaceholderStatement;
 class IfStatement;
+class TryCatchClause;
+class TryStatement;
 class BreakableStatement;
 class WhileStatement;
 class ForStatement;
@@ -98,5 +104,4 @@ using ASTPointer = std::shared_ptr<T>;
 
 using ASTString = std::string;
 
-}
 }

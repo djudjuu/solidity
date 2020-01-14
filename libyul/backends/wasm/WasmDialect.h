@@ -24,7 +24,7 @@
 
 #include <map>
 
-namespace yul
+namespace solidity::yul
 {
 
 class YulString;
@@ -47,12 +47,15 @@ struct WasmDialect: public Dialect
 	BuiltinFunction const* builtin(YulString _name) const override;
 	BuiltinFunction const* discardFunction() const override { return builtin("drop"_yulstring); }
 	BuiltinFunction const* equalityFunction() const override { return builtin("i64.eq"_yulstring); }
+	BuiltinFunction const* booleanNegationFunction() const override { return builtin("i64.eqz"_yulstring); }
 
 	std::set<YulString> fixedFunctionNames() const override { return {"main"_yulstring}; }
 
 	static WasmDialect const& instance();
 
 private:
+	void addEthereumExternals();
+
 	void addFunction(std::string _name, size_t _params, size_t _returns, bool _movable = true, bool _literalArguments = false);
 
 	std::map<YulString, BuiltinFunction> m_functions;

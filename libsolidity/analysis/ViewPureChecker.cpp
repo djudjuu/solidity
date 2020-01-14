@@ -21,17 +21,19 @@
 #include <libyul/backends/evm/EVMDialect.h>
 #include <liblangutil/ErrorReporter.h>
 #include <libevmasm/SemanticInformation.h>
+
 #include <functional>
+#include <variant>
 
 using namespace std;
-using namespace dev;
-using namespace langutil;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::langutil;
+using namespace solidity::frontend;
 
 namespace
 {
 
-class AssemblyViewPureChecker: public boost::static_visitor<void>
+class AssemblyViewPureChecker
 {
 public:
 	explicit AssemblyViewPureChecker(
@@ -41,32 +43,20 @@ public:
 		m_dialect(_dialect),
 		m_reportMutability(_reportMutability) {}
 
-	void operator()(yul::Label const&) { }
-	void operator()(yul::Instruction const& _instruction)
-	{
-		checkInstruction(_instruction.location, _instruction.instruction);
-	}
 	void operator()(yul::Literal const&) {}
 	void operator()(yul::Identifier const&) {}
-	void operator()(yul::FunctionalInstruction const& _instr)
-	{
-		checkInstruction(_instr.location, _instr.instruction);
-		for (auto const& arg: _instr.arguments)
-			boost::apply_visitor(*this, arg);
-	}
 	void operator()(yul::ExpressionStatement const& _expr)
 	{
-		boost::apply_visitor(*this, _expr.expression);
+		std::visit(*this, _expr.expression);
 	}
-	void operator()(yul::StackAssignment const&) {}
 	void operator()(yul::Assignment const& _assignment)
 	{
-		boost::apply_visitor(*this, *_assignment.value);
+		std::visit(*this, *_assignment.value);
 	}
 	void operator()(yul::VariableDeclaration const& _varDecl)
 	{
 		if (_varDecl.value)
-			boost::apply_visitor(*this, *_varDecl.value);
+			std::visit(*this, *_varDecl.value);
 	}
 	void operator()(yul::FunctionDefinition const& _funDef)
 	{
@@ -80,16 +70,16 @@ public:
 					checkInstruction(_funCall.location, *fun->instruction);
 
 		for (auto const& arg: _funCall.arguments)
-			boost::apply_visitor(*this, arg);
+			std::visit(*this, arg);
 	}
 	void operator()(yul::If const& _if)
 	{
-		boost::apply_visitor(*this, *_if.condition);
+		std::visit(*this, *_if.condition);
 		(*this)(_if.body);
 	}
 	void operator()(yul::Switch const& _switch)
 	{
-		boost::apply_visitor(*this, *_switch.expression);
+		std::visit(*this, *_switch.expression);
 		for (auto const& _case: _switch.cases)
 		{
 			if (_case.value)
@@ -100,7 +90,7 @@ public:
 	void operator()(yul::ForLoop const& _for)
 	{
 		(*this)(_for.pre);
-		boost::apply_visitor(*this, *_for.condition);
+		std::visit(*this, *_for.condition);
 		(*this)(_for.body);
 		(*this)(_for.post);
 	}
@@ -110,18 +100,21 @@ public:
 	void operator()(yul::Continue const&)
 	{
 	}
+	void operator()(yul::Leave const&)
+	{
+	}
 	void operator()(yul::Block const& _block)
 	{
 		for (auto const& s: _block.statements)
-			boost::apply_visitor(*this, s);
+			std::visit(*this, s);
 	}
 
 private:
-	void checkInstruction(SourceLocation _location, dev::eth::Instruction _instruction)
+	void checkInstruction(SourceLocation _location, evmasm::Instruction _instruction)
 	{
-		if (eth::SemanticInformation::invalidInViewFunctions(_instruction))
+		if (evmasm::SemanticInformation::invalidInViewFunctions(_instruction))
 			m_reportMutability(StateMutability::NonPayable, _location);
-		else if (eth::SemanticInformation::invalidInPureFunctions(_instruction))
+		else if (evmasm::SemanticInformation::invalidInPureFunctions(_instruction))
 			m_reportMutability(StateMutability::View, _location);
 	}
 
@@ -173,7 +166,8 @@ void ViewPureChecker::endVisit(FunctionDefinition const& _funDef)
 		!_funDef.body().statements().empty() &&
 		!_funDef.isConstructor() &&
 		!_funDef.isFallback() &&
-		!_funDef.annotation().superFunction
+		!_funDef.isReceive() &&
+		!_funDef.overrides()
 	)
 		m_errorReporter.warning(
 			_funDef.location(),
@@ -241,7 +235,7 @@ void ViewPureChecker::endVisit(InlineAssembly const& _inlineAssembly)
 void ViewPureChecker::reportMutability(
 	StateMutability _mutability,
 	SourceLocation const& _location,
-	boost::optional<SourceLocation> const& _nestedLocation
+	std::optional<SourceLocation> const& _nestedLocation
 )
 {
 	if (_mutability > m_bestMutabilityAndLocation.mutability)
@@ -278,7 +272,7 @@ void ViewPureChecker::reportMutability(
 	{
 		// We do not warn for library functions because they cannot be payable anyway.
 		// Also internal functions should be allowed to use `msg.value`.
-		if (m_currentFunction->isPublic() && m_currentFunction->inContractKind() != ContractDefinition::ContractKind::Library)
+		if (m_currentFunction->isPublic() && m_currentFunction->inContractKind() != ContractKind::Library)
 		{
 			if (_nestedLocation)
 				m_errorReporter.typeError(
@@ -385,7 +379,7 @@ void ViewPureChecker::endVisit(MemberAccess const& _memberAccess)
 	{
 		auto const& type = dynamic_cast<ArrayType const&>(*_memberAccess.expression().annotation().type);
 		if (member == "length" && type.isDynamicallySized() && type.dataStoredIn(DataLocation::Storage))
-			mutability = writes ? StateMutability::NonPayable : StateMutability::View;
+			mutability = StateMutability::View;
 		break;
 	}
 	default:
@@ -411,6 +405,13 @@ void ViewPureChecker::endVisit(IndexAccess const& _indexAccess)
 		if (_indexAccess.baseExpression().annotation().type->dataStoredIn(DataLocation::Storage))
 			reportMutability(writes ? StateMutability::NonPayable : StateMutability::View, _indexAccess.location());
 	}
+}
+
+void ViewPureChecker::endVisit(IndexRangeAccess const& _indexRangeAccess)
+{
+	bool writes = _indexRangeAccess.annotation().lValueRequested;
+	if (_indexRangeAccess.baseExpression().annotation().type->dataStoredIn(DataLocation::Storage))
+		reportMutability(writes ? StateMutability::NonPayable : StateMutability::View, _indexRangeAccess.location());
 }
 
 void ViewPureChecker::endVisit(ModifierInvocation const& _modifier)

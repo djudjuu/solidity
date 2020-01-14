@@ -1,17 +1,17 @@
 #pragma once
 
 #include <libsolidity/interface/CompilerStack.h>
+
 #include <libyul/AssemblyStack.h>
+
 #include <liblangutil/Exceptions.h>
 #include <liblangutil/SourceReferenceFormatter.h>
-#include <libdevcore/Keccak256.h>
 
-namespace dev
+#include <libsolutil/Keccak256.h>
+
+namespace solidity::test::abiv2fuzzer
 {
-namespace test
-{
-namespace abiv2fuzzer
-{
+
 class SolidityCompilationFramework
 {
 public:
@@ -21,15 +21,14 @@ public:
 	{
 		return m_compiler.methodIdentifiers(m_compiler.lastContractName());
 	}
-	dev::bytes compileContract(
+	bytes compileContract(
 		std::string const& _sourceCode,
 		std::string const& _contractName = {}
 	);
 protected:
-	dev::solidity::CompilerStack m_compiler;
+	frontend::CompilerStack m_compiler;
 	langutil::EVMVersion m_evmVersion;
-	dev::solidity::OptimiserSettings m_optimiserSettings = dev::solidity::OptimiserSettings::full();
+	frontend::OptimiserSettings m_optimiserSettings = frontend::OptimiserSettings::none();
 };
-}
-}
+
 }

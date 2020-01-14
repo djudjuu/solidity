@@ -24,8 +24,8 @@
 #include <libyul/AsmData.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
 
 void SSAValueTracker::operator()(Assignment const& _assignment)
 {
@@ -47,6 +47,16 @@ void SSAValueTracker::operator()(VariableDeclaration const& _varDecl)
 			setValue(var.name, nullptr);
 	else if (_varDecl.variables.size() == 1)
 		setValue(_varDecl.variables.front().name, _varDecl.value.get());
+}
+
+set<YulString> SSAValueTracker::ssaVariables(Block const& _ast)
+{
+	SSAValueTracker t;
+	t(_ast);
+	set<YulString> ssaVars;
+	for (auto const& value: t.values())
+		ssaVars.insert(value.first);
+	return ssaVars;
 }
 
 void SSAValueTracker::setValue(YulString _name, Expression const* _value)

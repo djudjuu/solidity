@@ -26,15 +26,13 @@
 
 #include <liblangutil/EVMVersion.h>
 
-#include <libdevcore/Common.h>
+#include <libsolutil/Common.h>
 
 #include <string>
 #include <memory>
 #include <vector>
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class ContractDefinition;
@@ -76,6 +74,7 @@ public:
 	}
 
 	std::string functionName(FunctionDefinition const& _function);
+	std::string functionName(VariableDeclaration const& _varDecl);
 	FunctionDefinition const& virtualFunction(FunctionDefinition const& _functionDeclaration);
 	std::string virtualFunctionName(FunctionDefinition const& _functionDeclaration);
 
@@ -105,5 +104,4 @@ private:
 	size_t m_varCounter = 0;
 };
 
-}
 }

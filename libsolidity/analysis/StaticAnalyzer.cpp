@@ -28,14 +28,14 @@
 #include <memory>
 
 using namespace std;
-using namespace dev;
-using namespace langutil;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::langutil;
+using namespace solidity::frontend;
 
 /**
  * Helper class that determines whether a contract's constructor uses inline assembly.
  */
-class dev::solidity::ConstructorUsesAssembly
+class solidity::frontend::ConstructorUsesAssembly
 {
 public:
 	/// @returns true if and only if the contract's or any of its bases' constructors
@@ -118,10 +118,12 @@ void StaticAnalyzer::endVisit(FunctionDefinition const&)
 		for (auto const& var: m_localVarUseCount)
 			if (var.second == 0)
 			{
-				if (var.first.second->isCallableParameter())
+				if (var.first.second->isCallableOrCatchParameter())
 					m_errorReporter.warning(
 						var.first.second->location(),
-						"Unused function parameter. Remove or comment out the variable name to silence this warning."
+						"Unused " +
+						string(var.first.second->isTryCatchParameter() ? "try/catch" : "function") +
+						" parameter. Remove or comment out the variable name to silence this warning."
 					);
 				else
 					m_errorReporter.warning(var.first.second->location(), "Unused local variable.");
@@ -227,7 +229,7 @@ bool StaticAnalyzer::visit(MemberAccess const& _memberAccess)
 	if (m_constructor)
 	{
 		auto const* expr = &_memberAccess.expression();
-		while(expr)
+		while (expr)
 		{
 			if (auto id = dynamic_cast<Identifier const*>(expr))
 			{

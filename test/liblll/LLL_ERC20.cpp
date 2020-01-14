@@ -33,14 +33,11 @@
 #define SUCCESS       encodeArgs(1)
 
 using namespace std;
-using namespace dev::lll;
-using namespace dev::test;
+using namespace solidity::lll;
+using namespace solidity::util;
+using namespace solidity::test;
 
-namespace dev
-{
-namespace lll
-{
-namespace test
+namespace solidity::lll::test
 {
 
 namespace
@@ -397,7 +394,7 @@ protected:
 		if (!s_compiledErc20)
 		{
 			vector<string> errors;
-			s_compiledErc20.reset(new bytes(compileLLL(erc20Code, dev::test::Options::get().evmVersion(), dev::test::Options::get().optimize, &errors)));
+			s_compiledErc20.reset(new bytes(compileLLL(erc20Code, solidity::test::Options::get().evmVersion(), solidity::test::Options::get().optimize, &errors)));
 			BOOST_REQUIRE(errors.empty());
 		}
 		sendMessage(*s_compiledErc20, true);
@@ -494,12 +491,12 @@ BOOST_AUTO_TEST_CASE(transfer_event)
 	BOOST_REQUIRE(callContractFunction("transfer(address,uint256)", ACCOUNT(1), u256(transfer)) == SUCCESS);
 
 	// Check that a Transfer event was recorded and contents are correct.
-	BOOST_REQUIRE(m_logs.size() == 1);
-	BOOST_CHECK(m_logs[0].data == encodeArgs(transfer));
-	BOOST_REQUIRE(m_logs[0].topics.size() == 3);
-	BOOST_CHECK(m_logs[0].topics[0] == keccak256(string("Transfer(address,address,uint256)")));
-	BOOST_CHECK(m_logs[0].topics[1] == ACCOUNT(0));
-	BOOST_CHECK(m_logs[0].topics[2] == ACCOUNT(1));
+	BOOST_REQUIRE(numLogs() == 1);
+	BOOST_CHECK(logData(0) == encodeArgs(transfer));
+	BOOST_REQUIRE(numLogTopics(0) == 3);
+	BOOST_CHECK(logTopic(0, 0) == keccak256(string("Transfer(address,address,uint256)")));
+	BOOST_CHECK(logTopic(0, 1) == ACCOUNT(0));
+	BOOST_CHECK(logTopic(0, 2) == ACCOUNT(1));
 }
 
 BOOST_AUTO_TEST_CASE(transfer_zero_no_event)
@@ -512,7 +509,7 @@ BOOST_AUTO_TEST_CASE(transfer_zero_no_event)
 	BOOST_REQUIRE(callContractFunction("transfer(address,uint256)", ACCOUNT(1), u256(transfer)) == SUCCESS);
 
 	// Check that no Event was recorded.
-	BOOST_CHECK(m_logs.size() == 0);
+	BOOST_CHECK(numLogs() == 0);
 
 	// Check that balances have not changed.
 	BOOST_CHECK(callContractFunction("balanceOf(address)", ACCOUNT(0)) == encodeArgs(TOKENSUPPLY - transfer));
@@ -529,12 +526,12 @@ BOOST_AUTO_TEST_CASE(approval_and_transfer_events)
 	BOOST_REQUIRE(callContractFunction("approve(address,uint256)", ACCOUNT(1), u256(allow)) == SUCCESS);
 
 	// Check that an Approval event was recorded and contents are correct.
-	BOOST_REQUIRE(m_logs.size() == 1);
-	BOOST_CHECK(m_logs[0].data == encodeArgs(allow));
-	BOOST_REQUIRE(m_logs[0].topics.size() == 3);
-	BOOST_CHECK(m_logs[0].topics[0] == keccak256(string("Approval(address,address,uint256)")));
-	BOOST_CHECK(m_logs[0].topics[1] == ACCOUNT(0));
-	BOOST_CHECK(m_logs[0].topics[2] == ACCOUNT(1));
+	BOOST_REQUIRE(numLogs() == 1);
+	BOOST_CHECK(logData(0) == encodeArgs(allow));
+	BOOST_REQUIRE(numLogTopics(0) == 3);
+	BOOST_CHECK(logTopic(0, 0) == keccak256(string("Approval(address,address,uint256)")));
+	BOOST_CHECK(logTopic(0, 1) == ACCOUNT(0));
+	BOOST_CHECK(logTopic(0, 2) == ACCOUNT(1));
 
 	// Send account(1) some ether for gas.
 	sendEther(account(1), 1000 * ether);
@@ -546,12 +543,12 @@ BOOST_AUTO_TEST_CASE(approval_and_transfer_events)
 	BOOST_REQUIRE(callContractFunction("transferFrom(address,address,uint256)", ACCOUNT(0), ACCOUNT(2), u256(transfer)) == SUCCESS);
 
 	// Check that a Transfer event was recorded and contents are correct.
-	BOOST_REQUIRE(m_logs.size() == 1);
-	BOOST_CHECK(m_logs[0].data == encodeArgs(transfer));
-	BOOST_REQUIRE(m_logs[0].topics.size() == 3);
-	BOOST_CHECK(m_logs[0].topics[0] == keccak256(string("Transfer(address,address,uint256)")));
-	BOOST_CHECK(m_logs[0].topics[1] == ACCOUNT(0));
-	BOOST_CHECK(m_logs[0].topics[2] == ACCOUNT(2));
+	BOOST_REQUIRE(numLogs() == 1);
+	BOOST_CHECK(logData(0) == encodeArgs(transfer));
+	BOOST_REQUIRE(numLogTopics(0) == 3);
+	BOOST_CHECK(logTopic(0, 0) == keccak256(string("Transfer(address,address,uint256)")));
+	BOOST_CHECK(logTopic(0, 1) == ACCOUNT(0));
+	BOOST_CHECK(logTopic(0, 2) == ACCOUNT(2));
 }
 
 BOOST_AUTO_TEST_CASE(invalid_transfer_1)
@@ -652,6 +649,4 @@ BOOST_AUTO_TEST_CASE(bad_data)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

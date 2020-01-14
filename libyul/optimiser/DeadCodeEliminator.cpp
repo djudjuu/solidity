@@ -20,6 +20,7 @@
 
 #include <libyul/optimiser/DeadCodeEliminator.h>
 #include <libyul/optimiser/Semantics.h>
+#include <libyul/optimiser/OptimiserStep.h>
 #include <libyul/AsmData.h>
 
 #include <libevmasm/SemanticInformation.h>
@@ -28,9 +29,14 @@
 #include <algorithm>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::yul;
 
+void DeadCodeEliminator::run(OptimiserStepContext& _context, Block& _ast)
+{
+	DeadCodeEliminator{_context.dialect}(_ast);
+}
 
 void DeadCodeEliminator::operator()(ForLoop& _for)
 {
@@ -50,7 +56,7 @@ void DeadCodeEliminator::operator()(Block& _block)
 			remove_if(
 				_block.statements.begin() + index + 1,
 				_block.statements.end(),
-				[] (Statement const& _s) { return _s.type() != typeid(yul::FunctionDefinition); }
+				[] (Statement const& _s) { return !holds_alternative<yul::FunctionDefinition>(_s); }
 			),
 			_block.statements.end()
 		);

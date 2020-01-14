@@ -29,37 +29,48 @@
 #include <liblangutil/EVMVersion.h>
 
 using namespace std;
-using namespace yul;
-using namespace dev;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
 
 map<YulString, int> CompilabilityChecker::run(
 	Dialect const& _dialect,
-	Block const& _ast,
+	Object const& _object,
 	bool _optimizeStackAllocation
 )
 {
 	if (_dialect.flavour == AsmFlavour::Yul)
 		return {};
 
-	solAssert(_dialect.flavour == AsmFlavour::Strict, "");
+	yulAssert(_dialect.flavour == AsmFlavour::Strict, "");
 
 	if (EVMDialect const* evmDialect = dynamic_cast<EVMDialect const*>(&_dialect))
 	{
 		NoOutputEVMDialect noOutputDialect(*evmDialect);
-		BuiltinContext builtinContext;
 
 		yul::AsmAnalysisInfo analysisInfo =
-			yul::AsmAnalyzer::analyzeStrictAssertCorrect(noOutputDialect, _ast);
+			yul::AsmAnalyzer::analyzeStrictAssertCorrect(noOutputDialect, _object);
 
+		BuiltinContext builtinContext;
+		builtinContext.currentObject = &_object;
+		for (auto name: _object.dataNames())
+			builtinContext.subIDs[name] = 1;
 		NoOutputAssembly assembly;
-		CodeTransform transform(assembly, analysisInfo, _ast, noOutputDialect, builtinContext, _optimizeStackAllocation);
+		CodeTransform transform(
+			assembly,
+			analysisInfo,
+			*_object.code,
+			noOutputDialect,
+			builtinContext,
+			_optimizeStackAllocation
+		);
 		try
 		{
-			transform(_ast);
+			transform(*_object.code);
 		}
 		catch (StackTooDeepError const&)
 		{
-			solAssert(!transform.stackErrors().empty(), "Got stack too deep exception that was not stored.");
+			yulAssert(!transform.stackErrors().empty(), "Got stack too deep exception that was not stored.");
 		}
 
 		std::map<YulString, int> functions;

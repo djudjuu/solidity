@@ -34,39 +34,42 @@
 
 #include <libsolidity/interface/ReadFile.h>
 #include <liblangutil/ErrorReporter.h>
-#include <liblangutil/Scanner.h>
 
+#include <set>
 #include <string>
 #include <vector>
 
-namespace langutil
+using solidity::util::h256;
+
+namespace solidity::langutil
 {
 class ErrorReporter;
 struct SourceLocation;
 }
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class BMC: public SMTEncoder
 {
 public:
-	BMC(smt::EncodingContext& _context, langutil::ErrorReporter& _errorReporter, std::map<h256, std::string> const& _smtlib2Responses);
+	BMC(
+		smt::EncodingContext& _context,
+		langutil::ErrorReporter& _errorReporter,
+		std::map<h256, std::string> const& _smtlib2Responses,
+		ReadCallback::Callback const& _smtCallback,
+		smt::SMTSolverChoice _enabledSolvers
+	);
 
-	void analyze(SourceUnit const& _sources, std::shared_ptr<langutil::Scanner> const& _scanner);
+	void analyze(SourceUnit const& _sources, std::set<Expression const*> _safeAssertions);
 
 	/// This is used if the SMT solver is not directly linked into this binary.
 	/// @returns a list of inputs to the SMT solver that were not part of the argument to
 	/// the constructor.
 	std::vector<std::string> unhandledQueries() { return m_interface->unhandledQueries(); }
 
-	/// @returns the FunctionDefinition of a called function if possible and should inline,
-	/// otherwise nullptr.
-	static FunctionDefinition const* inlinedFunctionCallToDefinition(FunctionCall const& _funCall);
-
-	std::shared_ptr<smt::SolverInterface> solver() { return m_interface; }
+	/// @returns true if _funCall should be inlined, otherwise false.
+	static bool shouldInlineFunctionCall(FunctionCall const& _funCall);
 
 private:
 	/// AST visitors.
@@ -74,6 +77,7 @@ private:
 	/// or checked are visited.
 	//@{
 	bool visit(ContractDefinition const& _node) override;
+	void endVisit(ContractDefinition const& _node) override;
 	bool visit(FunctionDefinition const& _node) override;
 	void endVisit(FunctionDefinition const& _node) override;
 	bool visit(IfStatement const& _node) override;
@@ -166,6 +170,8 @@ private:
 	smt::CheckResult checkSatisfiable();
 	//@}
 
+	std::unique_ptr<smt::SolverInterface> m_interface;
+
 	/// Flags used for better warning messages.
 	bool m_loopExecutionHappened = false;
 	bool m_externalFunctionCallHappened = false;
@@ -175,8 +181,8 @@ private:
 
 	std::vector<VerificationTarget> m_verificationTargets;
 
-	std::shared_ptr<smt::SolverInterface> m_interface;
+	/// Assertions that are known to be safe.
+	std::set<Expression const*> m_safeAssertions;
 };
 
-}
 }

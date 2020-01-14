@@ -9,13 +9,13 @@ library L {
 //     :L
 // [
 //   {
-//     "constant": true,
 //     "inputs":
 //     [
 //       {
 //         "components":
 //         [
 //           {
+//             "internalType": "uint256",
 //             "name": "a",
 //             "type": "uint256"
 //           },
@@ -23,25 +23,28 @@ library L {
 //             "components":
 //             [
 //               {
+//                 "internalType": "uint256[2]",
 //                 "name": "x",
 //                 "type": "uint256[2]"
 //               }
 //             ],
+//             "internalType": "struct L.T[]",
 //             "name": "sub",
 //             "type": "tuple[]"
 //           },
 //           {
+//             "internalType": "bytes",
 //             "name": "b",
 //             "type": "bytes"
 //           }
 //         ],
+//         "internalType": "struct L.S",
 //         "name": "s",
 //         "type": "tuple"
 //       }
 //     ],
 //     "name": "g",
 //     "outputs": [],
-//     "payable": false,
 //     "stateMutability": "view",
 //     "type": "function"
 //   }

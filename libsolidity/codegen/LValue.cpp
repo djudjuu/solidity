@@ -28,10 +28,11 @@
 #include <libevmasm/Instruction.h>
 
 using namespace std;
-using namespace dev;
-using namespace dev::eth;
-using namespace dev::solidity;
-using namespace langutil;
+using namespace solidity;
+using namespace solidity::evmasm;
+using namespace solidity::frontend;
+using namespace solidity::langutil;
+using namespace solidity::util;
 
 
 StackVariable::StackVariable(CompilerContext& _compilerContext, VariableDeclaration const& _declaration):
@@ -477,36 +478,6 @@ void StorageByteArrayElement::setToZero(SourceLocation const&, bool _removeRefer
 	// stack: ref old_full_value_with_cleared_byte
 	m_context << Instruction::SWAP1 << Instruction::SSTORE;
 }
-
-StorageArrayLength::StorageArrayLength(CompilerContext& _compilerContext, ArrayType const& _arrayType):
-	LValue(_compilerContext, _arrayType.memberType("length")),
-	m_arrayType(_arrayType)
-{
-	solAssert(m_arrayType.isDynamicallySized(), "");
-}
-
-void StorageArrayLength::retrieveValue(SourceLocation const&, bool _remove) const
-{
-	ArrayUtils(m_context).retrieveLength(m_arrayType);
-	if (_remove)
-		m_context << Instruction::SWAP1 << Instruction::POP;
-}
-
-void StorageArrayLength::storeValue(Type const&, SourceLocation const&, bool _move) const
-{
-	if (_move)
-		m_context << Instruction::SWAP1;
-	else
-		m_context << Instruction::DUP2;
-	ArrayUtils(m_context).resizeDynamicArray(m_arrayType);
-}
-
-void StorageArrayLength::setToZero(SourceLocation const&, bool _removeReference) const
-{
-	solAssert(_removeReference, "");
-	ArrayUtils(m_context).clearDynamicArray(m_arrayType);
-}
-
 
 TupleObject::TupleObject(
 	CompilerContext& _compilerContext,

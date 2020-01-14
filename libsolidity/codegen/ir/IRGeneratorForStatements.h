@@ -23,9 +23,7 @@
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/codegen/ir/IRLValue.h>
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class IRGenerationContext;
@@ -45,6 +43,9 @@ public:
 
 	std::string code() const;
 
+	/// Generates code to initialize the given state variable.
+	void initializeStateVar(VariableDeclaration const& _varDecl);
+
 	void endVisit(VariableDeclarationStatement const& _variableDeclaration) override;
 	bool visit(Assignment const& _assignment) override;
 	bool visit(TupleExpression const& _tuple) override;
@@ -60,6 +61,7 @@ public:
 	void endVisit(MemberAccess const& _memberAccess) override;
 	bool visit(InlineAssembly const& _inlineAsm) override;
 	void endVisit(IndexAccess const& _indexAccess) override;
+	void endVisit(IndexRangeAccess const& _indexRangeAccess) override;
 	void endVisit(Identifier const& _identifier) override;
 	bool visit(Literal const& _literal) override;
 
@@ -109,5 +111,4 @@ private:
 	std::unique_ptr<IRLValue> m_currentLValue;
 };
 
-}
 }

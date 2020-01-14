@@ -23,11 +23,12 @@
 
 #include <libyul/AsmDataForward.h>
 #include <libyul/optimiser/ASTWalker.h>
+#include <libyul/optimiser/OptimiserStep.h>
 
 #include <map>
 #include <vector>
 
-namespace yul
+namespace solidity::yul
 {
 struct Dialect;
 
@@ -90,6 +91,8 @@ struct Dialect;
  * For switch statements that have a "default"-case, there is no control-flow
  * part that skips the switch.
  *
+ * At ``leave`` statements, all return variables are set to "used".
+ *
  * When a variable goes out of scope, all statements still in the "undecided"
  * state are changed to "unused", unless the variable is the return
  * parameter of a function - there, the state changes to "used".
@@ -105,6 +108,9 @@ struct Dialect;
 class RedundantAssignEliminator: public ASTWalker
 {
 public:
+	static constexpr char const* name{"RedundantAssignEliminator"};
+	static void run(OptimiserStepContext&, Block& _ast);
+
 	explicit RedundantAssignEliminator(Dialect const& _dialect): m_dialect(&_dialect) {}
 	RedundantAssignEliminator() = delete;
 	RedundantAssignEliminator(RedundantAssignEliminator const&) = delete;
@@ -121,9 +127,8 @@ public:
 	void operator()(ForLoop const&) override;
 	void operator()(Break const&) override;
 	void operator()(Continue const&) override;
+	void operator()(Leave const&) override;
 	void operator()(Block const& _block) override;
-
-	static void run(Dialect const& _dialect, Block& _ast);
 
 private:
 	class State
@@ -156,11 +161,10 @@ private:
 	/// assignments to the final state. In this case, this also applies to pending
 	/// break and continue TrackedAssignments.
 	void finalize(YulString _variable, State _finalState);
-	/// Helper function for the above.
-	void finalize(TrackedAssignments& _assignments, YulString _variable, State _finalState);
 
 	Dialect const* m_dialect;
 	std::set<YulString> m_declaredVariables;
+	std::set<YulString> m_returnVariables;
 	std::set<Assignment const*> m_pendingRemovals;
 	TrackedAssignments m_assignments;
 

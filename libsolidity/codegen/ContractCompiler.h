@@ -24,13 +24,13 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/codegen/CompilerContext.h>
+#include <libsolidity/interface/DebugSettings.h>
 #include <libevmasm/Assembly.h>
 #include <functional>
 #include <ostream>
+#include <map>
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 /**
@@ -43,9 +43,11 @@ public:
 	explicit ContractCompiler(
 		ContractCompiler* _runtimeCompiler,
 		CompilerContext& _context,
-		OptimiserSettings _optimiserSettings
+		OptimiserSettings _optimiserSettings,
+		RevertStrings _revertStrings
 	):
 		m_optimiserSettings(std::move(_optimiserSettings)),
+		m_revertStrings(_revertStrings),
 		m_runtimeCompiler(_runtimeCompiler),
 		m_context(_context)
 	{
@@ -89,9 +91,9 @@ private:
 	/// Appends the function selector. Is called recursively to create a binary search tree.
 	/// @a _runs the number of intended executions of the contract to tune the split point.
 	void appendInternalSelector(
-		std::map<FixedHash<4>, eth::AssemblyItem const> const& _entryPoints,
-		std::vector<FixedHash<4>> const& _ids,
-		eth::AssemblyItem const& _notFoundTag,
+		std::map<util::FixedHash<4>, evmasm::AssemblyItem const> const& _entryPoints,
+		std::vector<util::FixedHash<4>> const& _ids,
+		evmasm::AssemblyItem const& _notFoundTag,
 		size_t _runs
 	);
 	void appendFunctionSelector(ContractDefinition const& _contract);
@@ -104,6 +106,9 @@ private:
 	bool visit(VariableDeclaration const& _variableDeclaration) override;
 	bool visit(FunctionDefinition const& _function) override;
 	bool visit(InlineAssembly const& _inlineAssembly) override;
+	bool visit(TryStatement const& _tryStatement) override;
+	void handleCatch(std::vector<ASTPointer<TryCatchClause>> const& _catchClauses);
+	bool visit(TryCatchClause const& _clause) override;
 	bool visit(IfStatement const& _ifStatement) override;
 	bool visit(WhileStatement const& _whileStatement) override;
 	bool visit(ForStatement const& _forStatement) override;
@@ -135,16 +140,17 @@ private:
 	void storeStackHeight(ASTNode const* _node);
 
 	OptimiserSettings const m_optimiserSettings;
+	RevertStrings const m_revertStrings;
 	/// Pointer to the runtime compiler in case this is a creation compiler.
 	ContractCompiler* m_runtimeCompiler = nullptr;
 	CompilerContext& m_context;
 	/// Tag to jump to for a "break" statement and the stack height after freeing the local loop variables.
-	std::vector<std::pair<eth::AssemblyItem, unsigned>> m_breakTags;
+	std::vector<std::pair<evmasm::AssemblyItem, unsigned>> m_breakTags;
 	/// Tag to jump to for a "continue" statement and the stack height after freeing the local loop variables.
-	std::vector<std::pair<eth::AssemblyItem, unsigned>> m_continueTags;
+	std::vector<std::pair<evmasm::AssemblyItem, unsigned>> m_continueTags;
 	/// Tag to jump to for a "return" statement and the stack height after freeing the local function or modifier variables.
 	/// Needs to be stacked because of modifiers.
-	std::vector<std::pair<eth::AssemblyItem, unsigned>> m_returnTags;
+	std::vector<std::pair<evmasm::AssemblyItem, unsigned>> m_returnTags;
 	unsigned m_modifierDepth = 0;
 	FunctionDefinition const* m_currentFunction = nullptr;
 
@@ -155,5 +161,4 @@ private:
 	std::map<unsigned, std::map<ASTNode const*, unsigned>> m_scopeStackHeight;
 };
 
-}
 }

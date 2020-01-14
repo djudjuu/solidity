@@ -10,10 +10,24 @@ contract Derived is Base {
 //     :Base
 // [
 //   {
-//     "constant": false,
+//     "anonymous": false,
 //     "inputs":
 //     [
 //       {
+//         "indexed": true,
+//         "internalType": "bytes32",
+//         "name": "evtArgBase",
+//         "type": "bytes32"
+//       }
+//     ],
+//     "name": "baseEvent",
+//     "type": "event"
+//   },
+//   {
+//     "inputs":
+//     [
+//       {
+//         "internalType": "uint256",
 //         "name": "p",
 //         "type": "uint256"
 //       }
@@ -22,26 +36,13 @@ contract Derived is Base {
 //     "outputs":
 //     [
 //       {
+//         "internalType": "uint256",
 //         "name": "i",
 //         "type": "uint256"
 //       }
 //     ],
-//     "payable": false,
 //     "stateMutability": "nonpayable",
 //     "type": "function"
-//   },
-//   {
-//     "anonymous": false,
-//     "inputs":
-//     [
-//       {
-//         "indexed": true,
-//         "name": "evtArgBase",
-//         "type": "bytes32"
-//       }
-//     ],
-//     "name": "baseEvent",
-//     "type": "event"
 //   }
 // ]
 //
@@ -49,46 +50,18 @@ contract Derived is Base {
 //     :Derived
 // [
 //   {
-//     "constant": false,
+//     "anonymous": false,
 //     "inputs":
 //     [
 //       {
-//         "name": "p",
-//         "type": "uint256"
-//       }
-//     ],
-//     "name": "baseFunction",
-//     "outputs":
-//     [
-//       {
-//         "name": "i",
-//         "type": "uint256"
-//       }
-//     ],
-//     "payable": false,
-//     "stateMutability": "nonpayable",
-//     "type": "function"
-//   },
-//   {
-//     "constant": false,
-//     "inputs":
-//     [
-//       {
-//         "name": "p",
+//         "indexed": true,
+//         "internalType": "bytes32",
+//         "name": "evtArgBase",
 //         "type": "bytes32"
 //       }
 //     ],
-//     "name": "derivedFunction",
-//     "outputs":
-//     [
-//       {
-//         "name": "i",
-//         "type": "bytes32"
-//       }
-//     ],
-//     "payable": false,
-//     "stateMutability": "nonpayable",
-//     "type": "function"
+//     "name": "baseEvent",
+//     "type": "event"
 //   },
 //   {
 //     "anonymous": false,
@@ -96,6 +69,7 @@ contract Derived is Base {
 //     [
 //       {
 //         "indexed": true,
+//         "internalType": "uint256",
 //         "name": "evtArgDerived",
 //         "type": "uint256"
 //       }
@@ -104,16 +78,45 @@ contract Derived is Base {
 //     "type": "event"
 //   },
 //   {
-//     "anonymous": false,
 //     "inputs":
 //     [
 //       {
-//         "indexed": true,
-//         "name": "evtArgBase",
+//         "internalType": "uint256",
+//         "name": "p",
+//         "type": "uint256"
+//       }
+//     ],
+//     "name": "baseFunction",
+//     "outputs":
+//     [
+//       {
+//         "internalType": "uint256",
+//         "name": "i",
+//         "type": "uint256"
+//       }
+//     ],
+//     "stateMutability": "nonpayable",
+//     "type": "function"
+//   },
+//   {
+//     "inputs":
+//     [
+//       {
+//         "internalType": "bytes32",
+//         "name": "p",
 //         "type": "bytes32"
 //       }
 //     ],
-//     "name": "baseEvent",
-//     "type": "event"
+//     "name": "derivedFunction",
+//     "outputs":
+//     [
+//       {
+//         "internalType": "bytes32",
+//         "name": "i",
+//         "type": "bytes32"
+//       }
+//     ],
+//     "stateMutability": "nonpayable",
+//     "type": "function"
 //   }
 // ]

@@ -12,7 +12,7 @@ This documentation is segmented into developer-focused messages and end-user-fac
 messages. These messages may be shown to the end user (the human) at the
 time that they will interact with the contract (i.e. sign a transaction).
 
-It is recommended that Solidity contracts are fully annontated using NatSpec for
+It is recommended that Solidity contracts are fully annotated using NatSpec for
 all public interfaces (everything in the ABI).
 
 NatSpec includes the formatting for comments that the smart contract author will
@@ -49,22 +49,22 @@ The following example shows a contract and a function using all available tags.
 
 .. code:: solidity
 
-   pragma solidity ^0.5.6;
+    pragma solidity >=0.5.0 <0.7.0;
 
-   /// @title A simulator for trees
-   /// @author Larry A. Gardner
-   /// @notice You can use this contract for only the most basic simulation
-   /// @dev All function calls are currently implemented without side effects
-   contract Tree {
-       /// @author Mary A. Botanist
-       /// @notice Calculate tree age in years, rounded up, for live trees
-       /// @dev The Alexandr N. Tetearing algorithm could increase precision
-       /// @param rings The number of rings from dendrochronological sample
-       /// @return age in years, rounded up for partial years
-       function age(uint256 rings) external pure returns (uint256) {
-           return rings + 1;
-       }
-   }
+    /// @title A simulator for trees
+    /// @author Larry A. Gardner
+    /// @notice You can use this contract for only the most basic simulation
+    /// @dev All function calls are currently implemented without side effects
+    contract Tree {
+        /// @author Mary A. Botanist
+        /// @notice Calculate tree age in years, rounded up, for live trees
+        /// @dev The Alexandr N. Tetearing algorithm could increase precision
+        /// @param rings The number of rings from dendrochronological sample
+        /// @return age in years, rounded up for partial years
+        function age(uint256 rings) external pure returns (uint256) {
+            return rings + 1;
+        }
+    }
 
 .. _header-tags:
 
@@ -84,7 +84,7 @@ Tag                                                                             
 ``@notice`` Explain to an end user what this does                                           contract, interface, function
 ``@dev``    Explain to a developer any extra details                                        contract, interface, function
 ``@param``  Documents a parameter just like in doxygen (must be followed by parameter name) function
-``@return`` Documents the return type of a contract's function                              function
+``@return`` Documents the return variables of a contract's function                         function
 =========== =============================================================================== =============================
 
 If your function returns multiple values, like ``(int quotient, int remainder)``

@@ -35,14 +35,14 @@
 #include <libyul/Dialect.h>
 #include <libyul/optimiser/ASTCopier.h>
 
-#include <libdevcore/Whiskers.h>
-#include <libdevcore/StringUtils.h>
-#include <libdevcore/Whiskers.h>
-#include <libdevcore/Keccak256.h>
+#include <libsolutil/Whiskers.h>
+#include <libsolutil/StringUtils.h>
+#include <libsolutil/Keccak256.h>
 
 using namespace std;
-using namespace dev;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::frontend;
 
 namespace
 {
@@ -131,6 +131,21 @@ string IRGeneratorForStatements::code() const
 {
 	solAssert(!m_currentLValue, "LValue not reset!");
 	return m_code.str();
+}
+
+void IRGeneratorForStatements::initializeStateVar(VariableDeclaration const& _varDecl)
+{
+	solAssert(m_context.isStateVariable(_varDecl), "Must be a state variable.");
+	solAssert(!_varDecl.isConstant(), "");
+	if (_varDecl.value())
+	{
+		_varDecl.value()->accept(*this);
+		string value = m_context.newYulVariable();
+		Type const& varType = *_varDecl.type();
+
+		m_code << "let " << value << " := " << expressionAsType(*_varDecl.value(), varType) << "\n";
+		m_code << IRStorageItem{m_context, _varDecl}.storeValue(value, varType);
+	}
 }
 
 void IRGeneratorForStatements::endVisit(VariableDeclarationStatement const& _varDeclStatement)
@@ -281,7 +296,7 @@ void IRGeneratorForStatements::endVisit(Return const& _return)
 			expressionAsType(*value, *types.front()) <<
 			"\n";
 	}
-	m_code << "return_flag := 0\n" << "break\n";
+	m_code << "leave\n";
 }
 
 void IRGeneratorForStatements::endVisit(UnaryOperation const& _unaryOperation)
@@ -528,7 +543,7 @@ void IRGeneratorForStatements::endVisit(FunctionCall const& _functionCall)
 		if (!event.isAnonymous())
 		{
 			indexedArgs.emplace_back(m_context.newYulVariable());
-			string signature = formatNumber(u256(h256::Arith(dev::keccak256(functionType->externalSignature()))));
+			string signature = formatNumber(u256(h256::Arith(keccak256(functionType->externalSignature()))));
 			m_code << "let " << indexedArgs.back() << " := " << signature << "\n";
 		}
 		for (size_t i = 0; i < event.parameters().size(); ++i)
@@ -593,8 +608,83 @@ void IRGeneratorForStatements::endVisit(FunctionCall const& _functionCall)
 
 		break;
 	}
+	// Array creation using new
+	case FunctionType::Kind::ObjectCreation:
+	{
+		ArrayType const& arrayType = dynamic_cast<ArrayType const&>(*_functionCall.annotation().type);
+		solAssert(arguments.size() == 1, "");
+
+		defineExpression(_functionCall) <<
+			m_utils.allocateMemoryArrayFunction(arrayType) <<
+			"(" <<
+				expressionAsType(*arguments[0], *TypeProvider::uint256()) <<
+			")\n";
+
+		break;
+	}
+	case FunctionType::Kind::KECCAK256:
+	{
+		solAssert(arguments.size() == 1, "");
+
+		ArrayType const* arrayType = TypeProvider::bytesMemory();
+		string const& array = m_context.newYulVariable();
+		m_code << "let " << array << " := " << expressionAsType(*arguments[0], *arrayType) << "\n";
+
+		defineExpression(_functionCall) <<
+			"keccak256(" <<
+			m_utils.arrayDataAreaFunction(*arrayType) << "(" <<
+			array <<
+			"), " <<
+			m_utils.arrayLengthFunction(*arrayType) <<
+			"(" <<
+			array <<
+			"))\n";
+
+			break;
+	}
+	case FunctionType::Kind::ArrayPop:
+	{
+		ArrayType const& arrayType = dynamic_cast<ArrayType const&>(
+			*dynamic_cast<MemberAccess const&>(_functionCall.expression()).expression().annotation().type
+		);
+		defineExpression(_functionCall) <<
+			m_utils.storageArrayPopFunction(arrayType) <<
+			"(" <<
+			m_context.variable(_functionCall.expression()) <<
+			")\n";
+		break;
+	}
+	case FunctionType::Kind::ArrayPush:
+	{
+		ArrayType const& arrayType = dynamic_cast<ArrayType const&>(
+			*dynamic_cast<MemberAccess const&>(_functionCall.expression()).expression().annotation().type
+		);
+		if (arguments.empty())
+		{
+			auto slotName = m_context.newYulVariable();
+			auto offsetName = m_context.newYulVariable();
+			m_code << "let " << slotName << ", " << offsetName << " := " <<
+				m_utils.storageArrayPushZeroFunction(arrayType) <<
+				"(" << m_context.variable(_functionCall.expression()) << ")\n";
+			setLValue(_functionCall, make_unique<IRStorageItem>(
+				m_context.utils(),
+				slotName,
+				offsetName,
+				*arrayType.baseType()
+			));
+		}
+		else
+			m_code <<
+				m_utils.storageArrayPushFunction(arrayType) <<
+				"(" <<
+				m_context.variable(_functionCall.expression()) <<
+				", " <<
+				expressionAsType(*arguments.front(), *arrayType.baseType()) <<
+				")\n";
+		break;
+	}
 	default:
-		solUnimplemented("");
+		solUnimplemented("FunctionKind " + toString(static_cast<int>(functionType->kind())) + " not yet implemented");
 	}
 }
 
@@ -669,6 +759,10 @@ void IRGeneratorForStatements::endVisit(MemberAccess const& _memberAccess)
 		{
 			solUnimplementedAssert(false, "");
 		}
+		else if (member == "address")
+		{
+			solUnimplementedAssert(false, "");
+		}
 		else
 			solAssert(
 				!!_memberAccess.expression().annotation().type->memberType(member),
@@ -735,31 +829,44 @@ void IRGeneratorForStatements::endVisit(MemberAccess const& _memberAccess)
 	{
 		auto const& type = dynamic_cast<ArrayType const&>(*_memberAccess.expression().annotation().type);
 
-		solAssert(member == "length", "");
-
-		if (!type.isDynamicallySized())
-			defineExpression(_memberAccess) << type.length() << "\n";
+		if (member == "length")
+		{
+			if (!type.isDynamicallySized())
+				defineExpression(_memberAccess) << type.length() << "\n";
+			else
+				switch (type.location())
+				{
+					case DataLocation::CallData:
+						solUnimplementedAssert(false, "");
+						//m_context << Instruction::SWAP1 << Instruction::POP;
+						break;
+					case DataLocation::Storage:
+					{
+						string slot = m_context.variable(_memberAccess.expression());
+						defineExpression(_memberAccess) <<
+							m_utils.arrayLengthFunction(type) + "(" + slot + ")\n";
+						break;
+					}
+					case DataLocation::Memory:
+						defineExpression(_memberAccess) <<
+							"mload(" <<
+							m_context.variable(_memberAccess.expression()) <<
+							")\n";
+						break;
+				}
+		}
+		else if (member == "pop")
+		{
+			solAssert(type.location() == DataLocation::Storage, "");
+			defineExpression(_memberAccess) << m_context.variable(_memberAccess.expression()) << "\n";
+		}
+		else if (member == "push")
+		{
+			solAssert(type.location() == DataLocation::Storage, "");
+			defineExpression(_memberAccess) << m_context.variable(_memberAccess.expression()) << "\n";
+		}
 		else
-			switch (type.location())
-			{
-			case DataLocation::CallData:
-				solUnimplementedAssert(false, "");
-				//m_context << Instruction::SWAP1 << Instruction::POP;
-				break;
-			case DataLocation::Storage:
-				setLValue(_memberAccess, make_unique<IRStorageArrayLength>(
-					m_context,
-					m_context.variable(_memberAccess.expression()),
-					*_memberAccess.annotation().type,
-					type
-				));
-
-				break;
-			case DataLocation::Memory:
-				solUnimplementedAssert(false, "");
-				//m_context << Instruction::MLOAD;
-				break;
-			}
+			solAssert(false, "Invalid array member access.");
 
 		break;
 	}
@@ -783,9 +890,9 @@ bool IRGeneratorForStatements::visit(InlineAssembly const& _inlineAsm)
 
 	yul::Statement modified = bodyCopier(_inlineAsm.operations());
 
-	solAssert(modified.type() == typeid(yul::Block), "");
+	solAssert(holds_alternative<yul::Block>(modified), "");
 
-	m_code << yul::AsmPrinter()(boost::get<yul::Block>(std::move(modified))) << "\n";
+	m_code << yul::AsmPrinter()(std::get<yul::Block>(std::move(modified))) << "\n";
 	return false;
 }
 
@@ -813,7 +920,7 @@ void IRGeneratorForStatements::endVisit(IndexAccess const& _indexAccess)
 			templ("key", ", " + m_context.variable(*_indexAccess.indexExpression()));
 		m_code << templ.render();
 		setLValue(_indexAccess, make_unique<IRStorageItem>(
-			m_context,
+			m_context.utils(),
 			slot,
 			0,
 			*_indexAccess.annotation().type
@@ -842,7 +949,7 @@ void IRGeneratorForStatements::endVisit(IndexAccess const& _indexAccess)
 				.render();
 
 				setLValue(_indexAccess, make_unique<IRStorageItem>(
-					m_context,
+					m_context.utils(),
 					slot,
 					offset,
 					*_indexAccess.annotation().type
@@ -851,13 +958,29 @@ void IRGeneratorForStatements::endVisit(IndexAccess const& _indexAccess)
 				break;
 			}
 			case DataLocation::Memory:
-				solUnimplementedAssert(false, "");
-				break;
-			case DataLocation::CallData:
-				solUnimplementedAssert(false, "");
-				break;
-		}
+			{
+				string const memAddress =
+					m_utils.memoryArrayIndexAccessFunction(arrayType) +
+					"(" +
+					m_context.variable(_indexAccess.baseExpression()) +
+					", " +
+					expressionAsType(*_indexAccess.indexExpression(), *TypeProvider::uint256()) +
+					")";
 
+				setLValue(_indexAccess, make_unique<IRMemoryItem>(
+					m_context.utils(),
+					memAddress,
+					false,
+					*arrayType.baseType()
+				));
+				break;
+			}
+			case DataLocation::CallData:
+			{
+				solUnimplemented("calldata not yet implemented!");
+
+			}
+		}
 	}
 	else if (baseType.category() == Type::Category::FixedBytes)
 		solUnimplementedAssert(false, "");
@@ -869,6 +992,11 @@ void IRGeneratorForStatements::endVisit(IndexAccess const& _indexAccess)
 	}
 	else
 		solAssert(false, "Index access only allowed for mappings or arrays.");
+}
+
+void IRGeneratorForStatements::endVisit(IndexRangeAccess const&)
+{
+	solUnimplementedAssert(false, "Index range accesses not yet implemented.");
 }
 
 void IRGeneratorForStatements::endVisit(Identifier const& _identifier)
@@ -1092,11 +1220,11 @@ void IRGeneratorForStatements::appendExternalFunctionCall(
 	{
 		// send all gas except the amount needed to execute "SUB" and "CALL"
 		// @todo this retains too much gas for now, needs to be fine-tuned.
-		u256 gasNeededByCaller = eth::GasCosts::callGas(m_context.evmVersion()) + 10;
+		u256 gasNeededByCaller = evmasm::GasCosts::callGas(m_context.evmVersion()) + 10;
 		if (funType.valueSet())
-			gasNeededByCaller += eth::GasCosts::callValueTransferGas;
+			gasNeededByCaller += evmasm::GasCosts::callValueTransferGas;
 		if (!checkExistence)
-			gasNeededByCaller += eth::GasCosts::callNewAccountGas; // we never know
+			gasNeededByCaller += evmasm::GasCosts::callNewAccountGas; // we never know
 		templ("gas", "sub(gas(), " + formatNumber(gasNeededByCaller) + ")");
 	}
 	// Order is important here, STATICCALL might overlap with DELEGATECALL.
@@ -1274,7 +1402,7 @@ void IRGeneratorForStatements::generateLoop(
 	m_code << "for {\n";
 	if (_initExpression)
 		_initExpression->accept(*this);
-	m_code << "} return_flag {\n";
+	m_code << "} 1 {\n";
 	if (_loopExpression)
 		_loopExpression->accept(*this);
 	m_code << "}\n";
@@ -1298,8 +1426,6 @@ void IRGeneratorForStatements::generateLoop(
 	_body.accept(*this);
 
 	m_code << "}\n";
-	// Bubble up the return condition.
-	m_code << "if iszero(return_flag) { break }\n";
 }
 
 Type const& IRGeneratorForStatements::type(Expression const& _expression)

@@ -20,8 +20,9 @@
 
 #include <liblangutil/EVMVersion.h>
 
-using namespace langutil;
-using namespace dev::eth;
+using namespace solidity;
+using namespace solidity::evmasm;
+using namespace solidity::langutil;
 
 bool EVMVersion::hasOpcode(Instruction _opcode) const
 {
@@ -40,6 +41,10 @@ bool EVMVersion::hasOpcode(Instruction _opcode) const
 		return hasCreate2();
 	case Instruction::EXTCODEHASH:
 		return hasExtCodeHash();
+	case Instruction::CHAINID:
+		return hasChainID();
+	case Instruction::SELFBALANCE:
+		return hasSelfBalance();
 	default:
 		return true;
 	}

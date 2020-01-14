@@ -17,7 +17,7 @@
 
 #include <test/TestCase.h>
 
-#include <libdevcore/StringUtils.h>
+#include <libsolutil/StringUtils.h>
 
 #include <boost/algorithm/cxx11/none_of.hpp>
 #include <boost/algorithm/string.hpp>
@@ -29,10 +29,10 @@
 
 #include <iostream>
 
-using namespace dev;
-using namespace solidity;
-using namespace dev::solidity::test;
 using namespace std;
+using namespace solidity;
+using namespace solidity::frontend;
+using namespace solidity::frontend::test;
 
 void TestCase::printUpdatedSettings(ostream& _stream, const string& _linePrefix, const bool)
 {
@@ -57,27 +57,49 @@ bool TestCase::validateSettings(langutil::EVMVersion)
 	if (!m_settings.empty())
 		throw runtime_error(
 			"Unknown setting(s): " +
-			joinHumanReadable(m_settings | boost::adaptors::map_keys)
+			util::joinHumanReadable(m_settings | boost::adaptors::map_keys)
 		);
 	return true;
 }
 
-string TestCase::parseSourceAndSettings(istream& _stream)
+pair<map<string, string>, size_t> TestCase::parseSourcesAndSettingsWithLineNumbers(istream& _stream)
 {
-	string source;
+	map<string, string> sources;
+	string currentSourceName;
+	string currentSource;
 	string line;
+	size_t lineNumber = 1;
+	static string const sourceDelimiterStart("==== Source:");
+	static string const sourceDelimiterEnd("====");
 	static string const comment("// ");
 	static string const settingsDelimiter("// ====");
 	static string const delimiter("// ----");
 	bool sourcePart = true;
 	while (getline(_stream, line))
 	{
+		lineNumber++;
+
 		if (boost::algorithm::starts_with(line, delimiter))
 			break;
 		else if (boost::algorithm::starts_with(line, settingsDelimiter))
 			sourcePart = false;
 		else if (sourcePart)
-			source += line + "\n";
+		{
+			if (boost::algorithm::starts_with(line, sourceDelimiterStart) && boost::algorithm::ends_with(line, sourceDelimiterEnd))
+			{
+				if (!(currentSourceName.empty() && currentSource.empty()))
+					sources[currentSourceName] = std::move(currentSource);
+				currentSource = {};
+				currentSourceName = boost::trim_copy(line.substr(
+					sourceDelimiterStart.size(),
+					line.size() - sourceDelimiterEnd.size() - sourceDelimiterStart.size()
+				));
+				if (sources.count(currentSourceName))
+					throw runtime_error("Multiple definitions of test source \"" + currentSourceName + "\".");
+			}
+			else
+				currentSource += line + "\n";
+		}
 		else if (boost::algorithm::starts_with(line, comment))
 		{
 			size_t colon = line.find(':');
@@ -92,7 +114,26 @@ string TestCase::parseSourceAndSettings(istream& _stream)
 		else
 			throw runtime_error(string("Expected \"//\" or \"// ---\" to terminate settings and source."));
 	}
-	return source;
+	sources[currentSourceName] = currentSource;
+	return {sources, lineNumber};
+}
+
+map<string, string> TestCase::parseSourcesAndSettings(istream& _stream)
+{
+	return get<0>(parseSourcesAndSettingsWithLineNumbers(_stream));
+}
+
+pair<string, size_t> TestCase::parseSourceAndSettingsWithLineNumbers(istream& _stream)
+{
+	auto [sourceMap, lineOffset] = parseSourcesAndSettingsWithLineNumbers(_stream);
+	if (sourceMap.size() != 1)
+		BOOST_THROW_EXCEPTION(runtime_error("Expected single source definition, but got multiple sources."));
+	return {std::move(sourceMap.begin()->second), lineOffset};
+}
+
+string TestCase::parseSourceAndSettings(istream& _stream)
+{
+	return parseSourceAndSettingsWithLineNumbers(_stream).first;
 }
 
 string TestCase::parseSimpleExpectations(std::istream& _file)
@@ -143,9 +184,9 @@ bool EVMVersionRestrictedTestCase::validateSettings(langutil::EVMVersion _evmVer
 			break;
 
 	versionString = versionString.substr(versionBegin);
-	boost::optional<langutil::EVMVersion> version = langutil::EVMVersion::fromString(versionString);
+	std::optional<langutil::EVMVersion> version = langutil::EVMVersion::fromString(versionString);
 	if (!version)
-		throw runtime_error("Invalid EVM version: \"" + versionString + "\"");
+		BOOST_THROW_EXCEPTION(runtime_error{"Invalid EVM version: \"" + versionString + "\""});
 
 	if (comparator == ">")
 		return _evmVersion > version;
@@ -160,6 +201,5 @@ bool EVMVersionRestrictedTestCase::validateSettings(langutil::EVMVersion _evmVer
 	else if (comparator == "!")
 		return !(_evmVersion == version);
 	else
-		throw runtime_error("Invalid EVM comparator: \"" + comparator + "\"");
-	return false; // not reached
+		BOOST_THROW_EXCEPTION(runtime_error{"Invalid EVM comparator: \"" + comparator + "\""});
 }

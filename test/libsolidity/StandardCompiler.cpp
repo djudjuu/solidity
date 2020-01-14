@@ -23,17 +23,13 @@
 #include <boost/test/unit_test.hpp>
 #include <libsolidity/interface/StandardCompiler.h>
 #include <libsolidity/interface/Version.h>
-#include <libdevcore/JSON.h>
+#include <libsolutil/JSON.h>
 #include <test/Metadata.h>
 
 using namespace std;
-using namespace dev::eth;
+using namespace solidity::evmasm;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 namespace
@@ -89,7 +85,7 @@ Json::Value compile(string _input)
 	StandardCompiler compiler;
 	string output = compiler.compile(std::move(_input));
 	Json::Value ret;
-	BOOST_REQUIRE(jsonParseStrict(output, ret));
+	BOOST_REQUIRE(util::jsonParseStrict(output, ret));
 	return ret;
 }
 
@@ -102,7 +98,7 @@ BOOST_AUTO_TEST_CASE(assume_object_input)
 	Json::Value result;
 
 	/// Use the native JSON interface of StandardCompiler to trigger these
-	solidity::StandardCompiler compiler;
+	frontend::StandardCompiler compiler;
 	result = compiler.compile(Json::Value());
 	BOOST_CHECK(containsError(result, "JSONError", "Input is not a JSON object."));
 	result = compiler.compile(Json::Value("INVALID"));
@@ -352,19 +348,19 @@ BOOST_AUTO_TEST_CASE(basic_compilation)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[]");
 	BOOST_CHECK(contract["devdoc"].isObject());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["devdoc"]), "{\"methods\":{}}");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["devdoc"]), "{\"methods\":{}}");
 	BOOST_CHECK(contract["userdoc"].isObject());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["userdoc"]), "{\"methods\":{}}");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["userdoc"]), "{\"methods\":{}}");
 	BOOST_CHECK(contract["evm"].isObject());
 	/// @TODO check evm.methodIdentifiers, legacyAssembly, bytecode, deployedBytecode
 	BOOST_CHECK(contract["evm"]["bytecode"].isObject());
 	BOOST_CHECK(contract["evm"]["bytecode"]["object"].isString());
 	BOOST_CHECK_EQUAL(
-		dev::test::bytecodeSansMetadata(contract["evm"]["bytecode"]["object"].asString()),
+		solidity::test::bytecodeSansMetadata(contract["evm"]["bytecode"]["object"].asString()),
 		string("6080604052348015600f57600080fd5b5060") +
-		(VersionIsRelease ? "3e" : toHex(bytes{uint8_t(60 + VersionStringStrict.size())})) +
+		(VersionIsRelease ? "3f" : util::toHex(bytes{uint8_t(61 + VersionStringStrict.size())})) +
 		"80601d6000396000f3fe6080604052600080fdfe"
 	);
 	BOOST_CHECK(contract["evm"]["assembly"].isString());
@@ -377,7 +373,7 @@ BOOST_AUTO_TEST_CASE(basic_compilation)
 		"tag_1:\n    /* \"fileA\":0:14  contract A { } */\n  pop\n  dataSize(sub_0)\n  dup1\n  "
 		"dataOffset(sub_0)\n  0x00\n  codecopy\n  0x00\n  return\nstop\n\nsub_0: assembly {\n        "
 		"/* \"fileA\":0:14  contract A { } */\n      mstore(0x40, 0x80)\n      0x00\n      "
-		"dup1\n      revert\n\n    auxdata: 0xa265627a7a72315820"
+		"dup1\n      revert\n\n    auxdata: 0xa26469706673582212"
 	) == 0);
 	BOOST_CHECK(contract["evm"]["gasEstimates"].isObject());
 	BOOST_CHECK_EQUAL(contract["evm"]["gasEstimates"].size(), 1);
@@ -396,7 +392,7 @@ BOOST_AUTO_TEST_CASE(basic_compilation)
 	BOOST_CHECK(contract["evm"]["legacyAssembly"].isObject());
 	BOOST_CHECK(contract["evm"]["legacyAssembly"][".code"].isArray());
 	BOOST_CHECK_EQUAL(
-		dev::jsonCompactPrint(contract["evm"]["legacyAssembly"][".code"]),
+		util::jsonCompactPrint(contract["evm"]["legacyAssembly"][".code"]),
 		"[{\"begin\":0,\"end\":14,\"name\":\"PUSH\",\"value\":\"80\"},"
 		"{\"begin\":0,\"end\":14,\"name\":\"PUSH\",\"value\":\"40\"},"
 		"{\"begin\":0,\"end\":14,\"name\":\"MSTORE\"},"
@@ -420,14 +416,14 @@ BOOST_AUTO_TEST_CASE(basic_compilation)
 		"{\"begin\":0,\"end\":14,\"name\":\"RETURN\"}]"
 	);
 	BOOST_CHECK(contract["metadata"].isString());
-	BOOST_CHECK(dev::test::isValidMetadata(contract["metadata"].asString()));
+	BOOST_CHECK(solidity::test::isValidMetadata(contract["metadata"].asString()));
 	BOOST_CHECK(result["sources"].isObject());
 	BOOST_CHECK(result["sources"]["fileA"].isObject());
 	BOOST_CHECK(result["sources"]["fileA"]["legacyAST"].isObject());
 	BOOST_CHECK_EQUAL(
-		dev::jsonCompactPrint(result["sources"]["fileA"]["legacyAST"]),
+		util::jsonCompactPrint(result["sources"]["fileA"]["legacyAST"]),
 		"{\"attributes\":{\"absolutePath\":\"fileA\",\"exportedSymbols\":{\"A\":[1]}},\"children\":"
-		"[{\"attributes\":{\"baseContracts\":[null],\"contractDependencies\":[null],\"contractKind\":\"contract\","
+		"[{\"attributes\":{\"abstract\":false,\"baseContracts\":[null],\"contractDependencies\":[null],\"contractKind\":\"contract\","
 		"\"documentation\":null,\"fullyImplemented\":true,\"linearizedBaseContracts\":[1],\"name\":\"A\",\"nodes\":[null],\"scope\":2},"
 		"\"id\":1,\"name\":\"ContractDefinition\",\"src\":\"0:14:0\"}],\"id\":2,\"name\":\"SourceUnit\",\"src\":\"0:14:0\"}"
 	);
@@ -464,7 +460,7 @@ BOOST_AUTO_TEST_CASE(compilation_error)
 		if (error["message"].asString().find("pre-release compiler") == string::npos)
 		{
 			BOOST_CHECK_EQUAL(
-				dev::jsonCompactPrint(error),
+				util::jsonCompactPrint(error),
 				"{\"component\":\"general\",\"formattedMessage\":\"fileA:1:23: ParserError: Expected identifier but got '}'\\n"
 				"contract A { function }\\n                      ^\\n\",\"message\":\"Expected identifier but got '}'\","
 				"\"severity\":\"error\",\"sourceLocation\":{\"end\":23,\"file\":\"fileA\",\"start\":22},\"type\":\"ParserError\"}"
@@ -499,7 +495,7 @@ BOOST_AUTO_TEST_CASE(output_selection_explicit)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[]");
 }
 
 BOOST_AUTO_TEST_CASE(output_selection_all_contracts)
@@ -528,7 +524,7 @@ BOOST_AUTO_TEST_CASE(output_selection_all_contracts)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[]");
 }
 
 BOOST_AUTO_TEST_CASE(output_selection_all_files_single_contract)
@@ -557,7 +553,7 @@ BOOST_AUTO_TEST_CASE(output_selection_all_files_single_contract)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[]");
 }
 
 BOOST_AUTO_TEST_CASE(output_selection_all_files_all_contracts)
@@ -586,7 +582,7 @@ BOOST_AUTO_TEST_CASE(output_selection_all_files_all_contracts)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[]");
 }
 
 BOOST_AUTO_TEST_CASE(output_selection_dependent_contract)
@@ -615,7 +611,7 @@ BOOST_AUTO_TEST_CASE(output_selection_dependent_contract)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[{\"constant\":false,\"inputs\":[],\"name\":\"f\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[{\"inputs\":[],\"name\":\"f\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]");
 }
 
 BOOST_AUTO_TEST_CASE(output_selection_dependent_contract_with_import)
@@ -647,7 +643,7 @@ BOOST_AUTO_TEST_CASE(output_selection_dependent_contract_with_import)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[{\"constant\":false,\"inputs\":[],\"name\":\"f\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[{\"inputs\":[],\"name\":\"f\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]");
 }
 
 BOOST_AUTO_TEST_CASE(filename_with_colon)
@@ -676,7 +672,7 @@ BOOST_AUTO_TEST_CASE(filename_with_colon)
 	Json::Value contract = getContractResult(result, "http://github.com/ethereum/solidity/std/StandardToken.sol", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["abi"].isArray());
-	BOOST_CHECK_EQUAL(dev::jsonCompactPrint(contract["abi"]), "[]");
+	BOOST_CHECK_EQUAL(util::jsonCompactPrint(contract["abi"]), "[]");
 }
 
 BOOST_AUTO_TEST_CASE(library_filename_with_colon)
@@ -900,9 +896,11 @@ BOOST_AUTO_TEST_CASE(evm_version)
 	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].asString().find("\"evmVersion\":\"constantinople\"") != string::npos);
 	result = compile(inputForVersion("\"evmVersion\": \"petersburg\","));
 	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].asString().find("\"evmVersion\":\"petersburg\"") != string::npos);
+	result = compile(inputForVersion("\"evmVersion\": \"istanbul\","));
+	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].asString().find("\"evmVersion\":\"istanbul\"") != string::npos);
 	// test default
 	result = compile(inputForVersion(""));
-	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].asString().find("\"evmVersion\":\"petersburg\"") != string::npos);
+	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].asString().find("\"evmVersion\":\"istanbul\"") != string::npos);
 	// test invalid
 	result = compile(inputForVersion("\"evmVersion\": \"invalid\","));
 	BOOST_CHECK(result["errors"][0]["message"].asString() == "Invalid EVM version requested.");
@@ -931,7 +929,7 @@ BOOST_AUTO_TEST_CASE(optimizer_settings_default_disabled)
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["metadata"].isString());
 	Json::Value metadata;
-	BOOST_CHECK(jsonParseStrict(contract["metadata"].asString(), metadata));
+	BOOST_CHECK(util::jsonParseStrict(contract["metadata"].asString(), metadata));
 
 	Json::Value const& optimizer = metadata["settings"]["optimizer"];
 	BOOST_CHECK(optimizer.isMember("enabled"));
@@ -964,7 +962,7 @@ BOOST_AUTO_TEST_CASE(optimizer_settings_default_enabled)
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["metadata"].isString());
 	Json::Value metadata;
-	BOOST_CHECK(jsonParseStrict(contract["metadata"].asString(), metadata));
+	BOOST_CHECK(util::jsonParseStrict(contract["metadata"].asString(), metadata));
 
 	Json::Value const& optimizer = metadata["settings"]["optimizer"];
 	BOOST_CHECK(optimizer.isMember("enabled"));
@@ -1004,7 +1002,7 @@ BOOST_AUTO_TEST_CASE(optimizer_settings_details_exactly_as_default_disabled)
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["metadata"].isString());
 	Json::Value metadata;
-	BOOST_CHECK(jsonParseStrict(contract["metadata"].asString(), metadata));
+	BOOST_CHECK(util::jsonParseStrict(contract["metadata"].asString(), metadata));
 
 	Json::Value const& optimizer = metadata["settings"]["optimizer"];
 	BOOST_CHECK(optimizer.isMember("enabled"));
@@ -1042,17 +1040,11 @@ BOOST_AUTO_TEST_CASE(optimizer_settings_details_different)
 	)";
 	Json::Value result = compile(input);
 	BOOST_CHECK(containsAtMostWarnings(result));
-	BOOST_CHECK(containsError(
-		result,
-		"Warning",
-		"The Yul optimiser is still experimental. "
-		"Do not use it in production unless correctness of generated code is verified with extensive tests."
-	));
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["metadata"].isString());
 	Json::Value metadata;
-	BOOST_CHECK(jsonParseStrict(contract["metadata"].asString(), metadata));
+	BOOST_CHECK(util::jsonParseStrict(contract["metadata"].asString(), metadata));
 
 	Json::Value const& optimizer = metadata["settings"]["optimizer"];
 	BOOST_CHECK(!optimizer.isMember("enabled"));
@@ -1101,7 +1093,7 @@ BOOST_AUTO_TEST_CASE(metadata_without_compilation)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["metadata"].isString());
-	BOOST_CHECK(dev::test::isValidMetadata(contract["metadata"].asString()));
+	BOOST_CHECK(solidity::test::isValidMetadata(contract["metadata"].asString()));
 }
 
 BOOST_AUTO_TEST_CASE(common_pattern)
@@ -1128,7 +1120,7 @@ BOOST_AUTO_TEST_CASE(common_pattern)
 	Json::Value contract = getContractResult(result, "fileA", "A");
 	BOOST_CHECK(contract.isObject());
 	BOOST_CHECK(contract["metadata"].isString());
-	BOOST_CHECK(dev::test::isValidMetadata(contract["metadata"].asString()));
+	BOOST_CHECK(solidity::test::isValidMetadata(contract["metadata"].asString()));
 	BOOST_CHECK(contract["evm"]["bytecode"].isObject());
 	BOOST_CHECK(contract["evm"]["bytecode"]["object"].isString());
 }
@@ -1182,9 +1174,9 @@ BOOST_AUTO_TEST_CASE(use_stack_optimization)
 	)";
 
 	Json::Value parsedInput;
-	BOOST_REQUIRE(jsonParseStrict(input, parsedInput));
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
 
-	dev::solidity::StandardCompiler compiler;
+	solidity::frontend::StandardCompiler compiler;
 	Json::Value result = compiler.compile(parsedInput);
 
 	BOOST_CHECK(containsAtMostWarnings(result));
@@ -1199,7 +1191,9 @@ BOOST_AUTO_TEST_CASE(use_stack_optimization)
 	result = compiler.compile(parsedInput);
 	BOOST_REQUIRE(result["errors"].isArray());
 	BOOST_CHECK(result["errors"][0]["severity"] == "error");
-	BOOST_CHECK(result["errors"][0]["type"] == "InternalCompilerError");
+	BOOST_REQUIRE(result["errors"][0]["message"].isString());
+	BOOST_CHECK(result["errors"][0]["message"].asString().find("Stack too deep when compiling inline assembly") != std::string::npos);
+	BOOST_CHECK(result["errors"][0]["type"] == "YulException");
 }
 
 BOOST_AUTO_TEST_CASE(standard_output_selection_wildcard)
@@ -1225,9 +1219,9 @@ BOOST_AUTO_TEST_CASE(standard_output_selection_wildcard)
 	)";
 
 	Json::Value parsedInput;
-	BOOST_REQUIRE(jsonParseStrict(input, parsedInput));
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
 
-	dev::solidity::StandardCompiler compiler;
+	solidity::frontend::StandardCompiler compiler;
 	Json::Value result = compiler.compile(parsedInput);
 
 	BOOST_REQUIRE(result["contracts"].isObject());
@@ -1266,9 +1260,9 @@ BOOST_AUTO_TEST_CASE(standard_output_selection_wildcard_colon_source)
 	)";
 
 	Json::Value parsedInput;
-	BOOST_REQUIRE(jsonParseStrict(input, parsedInput));
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
 
-	dev::solidity::StandardCompiler compiler;
+	solidity::frontend::StandardCompiler compiler;
 	Json::Value result = compiler.compile(parsedInput);
 
 	BOOST_REQUIRE(result["contracts"].isObject());
@@ -1306,9 +1300,9 @@ BOOST_AUTO_TEST_CASE(standard_output_selection_wildcard_empty_source)
 	)";
 
 	Json::Value parsedInput;
-	BOOST_REQUIRE(jsonParseStrict(input, parsedInput));
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
 
-	dev::solidity::StandardCompiler compiler;
+	solidity::frontend::StandardCompiler compiler;
 	Json::Value result = compiler.compile(parsedInput);
 
 	BOOST_REQUIRE(result["contracts"].isObject());
@@ -1350,9 +1344,9 @@ BOOST_AUTO_TEST_CASE(standard_output_selection_wildcard_multiple_sources)
 	)";
 
 	Json::Value parsedInput;
-	BOOST_REQUIRE(jsonParseStrict(input, parsedInput));
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
 
-	dev::solidity::StandardCompiler compiler;
+	solidity::frontend::StandardCompiler compiler;
 	Json::Value result = compiler.compile(parsedInput);
 
 	BOOST_REQUIRE(result["contracts"].isObject());
@@ -1370,6 +1364,4 @@ BOOST_AUTO_TEST_CASE(standard_output_selection_wildcard_multiple_sources)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

@@ -17,7 +17,7 @@
 
 #include <test/tools/fuzzer_common.h>
 
-#include <libdevcore/JSON.h>
+#include <libsolutil/JSON.h>
 #include <libevmasm/Assembly.h>
 #include <libevmasm/ConstantOptimiser.h>
 #include <libsolc/libsolc.h>
@@ -25,19 +25,30 @@
 #include <sstream>
 
 using namespace std;
-using namespace dev;
-using namespace dev::eth;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::evmasm;
+
+static vector<string> s_evmVersions = {
+	"homestead",
+	"tangerineWhistle",
+	"spuriousDragon",
+	"byzantium",
+	"constantinople",
+	"petersburg",
+	"istanbul"
+};
 
 void FuzzerUtil::runCompiler(string const& _input, bool _quiet)
 {
 	if (!_quiet)
 		cout << "Input JSON: " << _input << endl;
-	string outputString(solidity_compile(_input.c_str(), nullptr));
+	string outputString(solidity_compile(_input.c_str(), nullptr, nullptr));
 	if (!_quiet)
 		cout << "Output JSON: " << outputString << endl;
 
 	// This should be safe given the above copies the output.
-	solidity_free();
+	solidity_reset();
 
 	Json::Value output;
 	if (!jsonParseStrict(outputString, output))
@@ -76,6 +87,7 @@ void FuzzerUtil::testCompiler(string const& _input, bool _optimize, bool _quiet)
 	config["settings"]["optimizer"] = Json::objectValue;
 	config["settings"]["optimizer"]["enabled"] = _optimize;
 	config["settings"]["optimizer"]["runs"] = 200;
+	config["settings"]["evmVersion"] = s_evmVersions[_input.size() % s_evmVersions.size()];
 
 	// Enable all SourceUnit-level outputs.
 	config["settings"]["outputSelection"]["*"][""][0] = "*";

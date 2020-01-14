@@ -16,20 +16,22 @@
 */
 #include <libyul/optimiser/ControlFlowSimplifier.h>
 #include <libyul/optimiser/Semantics.h>
+#include <libyul/optimiser/OptimiserStep.h>
 #include <libyul/AsmData.h>
 #include <libyul/Utilities.h>
 #include <libyul/Dialect.h>
-#include <libdevcore/CommonData.h>
-#include <libdevcore/Visitor.h>
+#include <libsolutil/CommonData.h>
+#include <libsolutil/Visitor.h>
 
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/algorithm/cxx11/any_of.hpp>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::yul;
 
-using OptionalStatements = boost::optional<vector<Statement>>;
+using OptionalStatements = std::optional<vector<Statement>>;
 
 namespace
 {
@@ -125,16 +127,28 @@ OptionalStatements reduceSingleCaseSwitch(Dialect const& _dialect, Switch& _swit
 
 }
 
+void ControlFlowSimplifier::run(OptimiserStepContext& _context, Block& _ast)
+{
+	ControlFlowSimplifier{_context.dialect}(_ast);
+}
+
 void ControlFlowSimplifier::operator()(Block& _block)
 {
 	simplify(_block.statements);
 }
 
+void ControlFlowSimplifier::operator()(FunctionDefinition& _funDef)
+{
+	ASTModifier::operator()(_funDef);
+	if (!_funDef.body.statements.empty() && holds_alternative<Leave>(_funDef.body.statements.back()))
+		_funDef.body.statements.pop_back();
+}
+
 void ControlFlowSimplifier::visit(Statement& _st)
 {
-	if (_st.type() == typeid(ForLoop))
+	if (holds_alternative<ForLoop>(_st))
 	{
-		ForLoop& forLoop = boost::get<ForLoop>(_st);
+		ForLoop& forLoop = std::get<ForLoop>(_st);
 		yulAssert(forLoop.pre.statements.empty(), "");
 
 		size_t outerBreak = m_numBreakStatements;
@@ -153,7 +167,10 @@ void ControlFlowSimplifier::visit(Statement& _st)
 				isTerminating = true;
 				--m_numBreakStatements;
 			}
-			else if (controlFlow == TerminationFinder::ControlFlow::Terminate)
+			else if (
+				controlFlow == TerminationFinder::ControlFlow::Terminate ||
+				controlFlow == TerminationFinder::ControlFlow::Leave
+			)
 				isTerminating = true;
 
 			if (isTerminating && m_numContinueStatements == 0 && m_numBreakStatements == 0)
@@ -174,7 +191,8 @@ void ControlFlowSimplifier::visit(Statement& _st)
 
 void ControlFlowSimplifier::simplify(std::vector<yul::Statement>& _statements)
 {
-	GenericFallbackReturnsVisitor<OptionalStatements, If, Switch> const visitor(
+	GenericVisitor visitor{
+		VisitorFallback<OptionalStatements>{},
 		[&](If& _ifStmt) -> OptionalStatements {
 			if (_ifStmt.body.statements.empty() && m_dialect.discardFunction())
 			{
@@ -199,13 +217,12 @@ void ControlFlowSimplifier::simplify(std::vector<yul::Statement>& _statements)
 
 			return {};
 		}
-	);
-
+	};
 	iterateReplacing(
 		_statements,
 		[&](Statement& _stmt) -> OptionalStatements
 		{
-			OptionalStatements result = boost::apply_visitor(visitor, _stmt);
+			OptionalStatements result = std::visit(visitor, _stmt);
 			if (result)
 				simplify(*result);
 			else

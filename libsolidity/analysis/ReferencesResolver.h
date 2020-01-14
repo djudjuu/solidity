@@ -24,20 +24,19 @@
 
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/ASTAnnotations.h>
+#include <liblangutil/EVMVersion.h>
 
 #include <boost/noncopyable.hpp>
 #include <list>
 #include <map>
 
-namespace langutil
+namespace solidity::langutil
 {
 class ErrorReporter;
 struct SourceLocation;
 }
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class NameAndTypeResolver;
@@ -52,10 +51,12 @@ public:
 	ReferencesResolver(
 		langutil::ErrorReporter& _errorReporter,
 		NameAndTypeResolver& _resolver,
+		langutil::EVMVersion _evmVersion,
 		bool _resolveInsideCode = false
 	):
 		m_errorReporter(_errorReporter),
 		m_resolver(_resolver),
+		m_evmVersion(_evmVersion),
 		m_resolveInsideCode(_resolveInsideCode)
 	{}
 
@@ -91,16 +92,19 @@ private:
 	/// Adds a new error to the list of errors.
 	void declarationError(langutil::SourceLocation const& _location, std::string const& _description);
 
+	/// Adds a new error to the list of errors.
+	void declarationError(langutil::SourceLocation const& _location, langutil::SecondarySourceLocation const& _ssl, std::string const& _description);
+
 	/// Adds a new error to the list of errors and throws to abort reference resolving.
 	void fatalDeclarationError(langutil::SourceLocation const& _location, std::string const& _description);
 
 	langutil::ErrorReporter& m_errorReporter;
 	NameAndTypeResolver& m_resolver;
+	langutil::EVMVersion m_evmVersion;
 	/// Stack of return parameters.
 	std::vector<ParameterList const*> m_returnParameters;
 	bool const m_resolveInsideCode;
 	bool m_errorOccurred = false;
 };
 
-}
 }

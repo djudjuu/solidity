@@ -24,21 +24,11 @@
 #include <boost/test/framework.hpp>
 #include <test/libsolidity/SolidityExecutionFramework.h>
 
-using namespace dev;
-using namespace dev::test;
-using namespace dev::solidity;
-using namespace dev::solidity::test;
+using namespace solidity;
+using namespace solidity::test;
+using namespace solidity::frontend;
+using namespace solidity::frontend::test;
 using namespace std;
-
-SolidityExecutionFramework::SolidityExecutionFramework():
-	ExecutionFramework()
-{
-}
-
-SolidityExecutionFramework::SolidityExecutionFramework(std::string const& _ipcPath, langutil::EVMVersion _evmVersion):
-	ExecutionFramework(_ipcPath, _evmVersion)
-{
-}
 
 bytes SolidityExecutionFramework::compileContract(
 	string const& _sourceCode,
@@ -49,7 +39,7 @@ bytes SolidityExecutionFramework::compileContract(
 	// Silence compiler version warning
 	std::string sourceCode = "pragma solidity >=0.0;\n";
 	if (
-		dev::test::Options::get().useABIEncoderV2 &&
+		solidity::test::Options::get().useABIEncoderV2 &&
 		_sourceCode.find("pragma experimental ABIEncoderV2;") == std::string::npos
 	)
 		sourceCode += "pragma experimental ABIEncoderV2;\n";
@@ -57,6 +47,7 @@ bytes SolidityExecutionFramework::compileContract(
 	m_compiler.reset();
 	m_compiler.setSources({{"", sourceCode}});
 	m_compiler.setLibraries(_libraryAddresses);
+	m_compiler.setRevertStringBehaviour(m_revertStrings);
 	m_compiler.setEVMVersion(m_evmVersion);
 	m_compiler.setOptimiserSettings(m_optimiserSettings);
 	m_compiler.enableIRGeneration(m_compileViaYul);
@@ -68,7 +59,7 @@ bytes SolidityExecutionFramework::compileContract(
 			formatter.printErrorInformation(*error);
 		BOOST_ERROR("Compiling contract failed");
 	}
-	eth::LinkerObject obj;
+	evmasm::LinkerObject obj;
 	if (m_compileViaYul)
 	{
 		yul::AssemblyStack asmStack(

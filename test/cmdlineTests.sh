@@ -31,8 +31,9 @@ set -e
 ## GLOBAL VARIABLES
 
 REPO_ROOT=$(cd $(dirname "$0")/.. && pwd)
+SOLIDITY_BUILD_DIR=${SOLIDITY_BUILD_DIR:-build}
 source "${REPO_ROOT}/scripts/common.sh"
-SOLC="$REPO_ROOT/build/solc/solc"
+SOLC="$REPO_ROOT/${SOLIDITY_BUILD_DIR}/solc/solc"
 INTERACTIVE=true
 if ! tty -s || [ "$CI" ]
 then
@@ -73,7 +74,7 @@ function compileFull()
     set +e
     "$SOLC" $FULLARGS $files >/dev/null 2>"$stderr_path"
     local exit_code=$?
-    local errors=$(grep -v -E 'Warning: This is a pre-release compiler version|Warning: Experimental features are turned on|pragma experimental ABIEncoderV2|\^-------------------------------\^' < "$stderr_path")
+    local errors=$(grep -v -E 'Warning: This is a pre-release compiler version|Warning: Experimental features are turned on|pragma experimental ABIEncoderV2|^ +--> |^ +\||^[0-9]+ +\|' < "$stderr_path")
     set -e
     rm "$stderr_path"
 
@@ -142,8 +143,9 @@ function test_solc_behaviour()
 
     if [[ "$solc_args" == *"--standard-json"* ]]
     then
-        sed -i -e 's/{[^{]*Warning: This is a pre-release compiler version[^}]*},\{0,1\}//' "$stdout_path"
-        sed -i -e 's/"errors":\[\],\{0,1\}//' "$stdout_path"
+        sed -i.bak -e 's/{[^{]*Warning: This is a pre-release compiler version[^}]*},\{0,1\}//' "$stdout_path"
+        sed -i.bak -E -e 's/ Consider adding \\"pragma solidity \^[0-9.]*;\\"//g' "$stdout_path"
+        sed -i.bak -e 's/"errors":\[\],\{0,1\}//' "$stdout_path"
         # Remove explicit bytecode and references to bytecode offsets
         sed -i.bak -E -e 's/\"object\":\"[a-f0-9]+\"/\"object\":\"bytecode removed\"/g' "$stdout_path"
         sed -i.bak -E -e 's/\"opcodes\":\"[^"]+\"/\"opcodes\":\"opcodes removed\"/g' "$stdout_path"
@@ -152,13 +154,18 @@ function test_solc_behaviour()
         sed -i.bak -E -e 's/\\n/\'$'\n/g' "$stdout_path"
         rm "$stdout_path.bak"
     else
-        sed -i -e '/^Warning: This is a pre-release compiler version, please do not use it in production./d' "$stderr_path"
-        sed -i -e 's/ Consider adding "pragma .*$//' "$stderr_path"
+        sed -i.bak -e '/^Warning: This is a pre-release compiler version, please do not use it in production./d' "$stderr_path"
+        sed -i.bak -e 's/ Consider adding "pragma .*$//' "$stderr_path"
+        # Remove trailing empty lines. Needs a line break to make OSX sed happy.
+        sed -i.bak -e '1{/^$/d
+}' "$stderr_path"
+       rm "$stderr_path.bak"
     fi
     # Remove path to cpp file
-    sed -i -e 's/^\(Exception while assembling:\).*/\1/' "$stderr_path"
+    sed -i.bak -e 's/^\(Exception while assembling:\).*/\1/' "$stderr_path"
     # Remove exception class name.
-    sed -i -e 's/^\(Dynamic exception type:\).*/\1/' "$stderr_path"
+    sed -i.bak -e 's/^\(Dynamic exception type:\).*/\1/' "$stderr_path"
+    rm "$stderr_path.bak"
 
     if [[ $exitCode -ne "$exit_code_expected" ]]
     then
@@ -308,6 +315,7 @@ SOLTMPDIR=$(mktemp -d)
     set -e
     cd "$SOLTMPDIR"
     "$REPO_ROOT"/scripts/isolate_tests.py "$REPO_ROOT"/docs/ docs
+
     for f in *.sol
     do
         # The contributors guide uses syntax tests, but we cannot
@@ -317,6 +325,7 @@ SOLTMPDIR=$(mktemp -d)
             continue
         fi
         echo "$f"
+
         opts=''
         # We expect errors if explicitly stated, or if imports
         # are used (in the style guide)
@@ -428,6 +437,19 @@ SOLTMPDIR=$(mktemp -d)
     fi
 )
 
+printTask "Testing AST import..."
+SOLTMPDIR=$(mktemp -d)
+(
+    cd "$SOLTMPDIR"
+    $REPO_ROOT/scripts/ASTImportTest.sh
+    if [ $? -ne 0 ]
+    then
+        rm -rf "$SOLTMPDIR"
+        exit 1
+    fi
+)
+rm -rf "$SOLTMPDIR"
+
 printTask "Testing soljson via the fuzzer..."
 SOLTMPDIR=$(mktemp -d)
 (
@@ -436,8 +458,8 @@ SOLTMPDIR=$(mktemp -d)
     "$REPO_ROOT"/scripts/isolate_tests.py "$REPO_ROOT"/test/
     "$REPO_ROOT"/scripts/isolate_tests.py "$REPO_ROOT"/docs/ docs
 
-    echo *.sol | xargs -P 4 -n 50 "$REPO_ROOT"/build/test/tools/solfuzzer --quiet --input-files
-    echo *.sol | xargs -P 4 -n 50 "$REPO_ROOT"/build/test/tools/solfuzzer --without-optimizer --quiet --input-files
+    echo *.sol | xargs -P 4 -n 50 "$REPO_ROOT"/${SOLIDITY_BUILD_DIR}/test/tools/solfuzzer --quiet --input-files
+    echo *.sol | xargs -P 4 -n 50 "$REPO_ROOT"/${SOLIDITY_BUILD_DIR}/test/tools/solfuzzer --without-optimizer --quiet --input-files
 )
 rm -rf "$SOLTMPDIR"
 

@@ -19,11 +19,12 @@
 
 #include <libevmasm/KnownState.h>
 
-#include <libdevcore/FixedHash.h>
+#include <libsolutil/FixedHash.h>
 
 using namespace std;
-using namespace dev;
-using namespace dev::eth;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::evmasm;
 
 GasMeter::GasConsumption& GasMeter::GasConsumption::operator+=(GasConsumption const& _other)
 {
@@ -188,6 +189,12 @@ GasMeter::GasConsumption GasMeter::estimateMax(AssemblyItem const& _item, bool _
 		case Instruction::BALANCE:
 			gas = GasCosts::balanceGas(m_evmVersion);
 			break;
+		case Instruction::CHAINID:
+			gas = runGas(Instruction::CHAINID);
+			break;
+		case Instruction::SELFBALANCE:
+			gas = runGas(Instruction::SELFBALANCE);
+			break;
 		default:
 			gas = runGas(_item.instruction());
 			break;
@@ -260,13 +267,13 @@ unsigned GasMeter::runGas(Instruction _instruction)
 	return 0;
 }
 
-u256 GasMeter::dataGas(bytes const& _data, bool _inCreation)
+u256 GasMeter::dataGas(bytes const& _data, bool _inCreation, langutil::EVMVersion _evmVersion)
 {
 	bigint gas = 0;
 	if (_inCreation)
 	{
 		for (auto b: _data)
-			gas += (b != 0) ? GasCosts::txDataNonZeroGas : GasCosts::txDataZeroGas;
+			gas += (b != 0) ? GasCosts::txDataNonZeroGas(_evmVersion) : GasCosts::txDataZeroGas;
 	}
 	else
 		gas = bigint(GasCosts::createDataGas) * _data.size();

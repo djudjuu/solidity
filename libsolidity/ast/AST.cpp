@@ -25,58 +25,32 @@
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/ast/AST_accept.h>
 #include <libsolidity/ast/TypeProvider.h>
-#include <libdevcore/Keccak256.h>
+#include <libsolutil/Keccak256.h>
 
 #include <boost/algorithm/string.hpp>
 #include <algorithm>
 #include <functional>
 
 using namespace std;
-using namespace dev;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::frontend;
 
-class IDDispenser
-{
-public:
-	static size_t next() { return ++instance(); }
-	static void reset() { instance() = 0; }
-private:
-	static size_t& instance()
-	{
-		static IDDispenser dispenser;
-		return dispenser.id;
-	}
-	size_t id = 0;
-};
-
-ASTNode::ASTNode(SourceLocation const& _location):
-	m_id(IDDispenser::next()),
+ASTNode::ASTNode(int64_t _id, SourceLocation const& _location):
+	m_id(_id),
 	m_location(_location)
 {
-}
-
-ASTNode::~ASTNode()
-{
-	delete m_annotation;
-}
-
-void ASTNode::resetID()
-{
-	IDDispenser::reset();
 }
 
 ASTAnnotation& ASTNode::annotation() const
 {
 	if (!m_annotation)
-		m_annotation = new ASTAnnotation();
+		m_annotation = make_unique<ASTAnnotation>();
 	return *m_annotation;
 }
 
 SourceUnitAnnotation& SourceUnit::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new SourceUnitAnnotation();
-	return dynamic_cast<SourceUnitAnnotation&>(*m_annotation);
+	return initAnnotation<SourceUnitAnnotation>();
 }
 
 set<SourceUnit const*> SourceUnit::referencedSourceUnits(bool _recurse, set<SourceUnit const*> _skipList) const
@@ -98,9 +72,7 @@ set<SourceUnit const*> SourceUnit::referencedSourceUnits(bool _recurse, set<Sour
 
 ImportAnnotation& ImportDirective::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new ImportAnnotation();
-	return dynamic_cast<ImportAnnotation&>(*m_annotation);
+	return initAnnotation<ImportAnnotation>();
 }
 
 TypePointer ImportDirective::type() const
@@ -109,11 +81,21 @@ TypePointer ImportDirective::type() const
 	return TypeProvider::module(*annotation().sourceUnit);
 }
 
-map<FixedHash<4>, FunctionTypePointer> ContractDefinition::interfaceFunctions() const
+vector<VariableDeclaration const*> ContractDefinition::stateVariablesIncludingInherited() const
+{
+	vector<VariableDeclaration const*> stateVars;
+	for (auto const& contract: annotation().linearizedBaseContracts)
+		for (auto var: contract->stateVariables())
+			if (*contract == *this || var->isVisibleInDerivedContracts())
+				stateVars.push_back(var);
+	return stateVars;
+}
+
+map<util::FixedHash<4>, FunctionTypePointer> ContractDefinition::interfaceFunctions() const
 {
 	auto exportedFunctionList = interfaceFunctionList();
 
-	map<FixedHash<4>, FunctionTypePointer> exportedFunctions;
+	map<util::FixedHash<4>, FunctionTypePointer> exportedFunctions;
 	for (auto const& it: exportedFunctionList)
 		exportedFunctions.insert(it);
 
@@ -141,7 +123,7 @@ bool ContractDefinition::constructorIsPublic() const
 
 bool ContractDefinition::canBeDeployed() const
 {
-	return constructorIsPublic() && annotation().unimplementedFunctions.empty();
+	return constructorIsPublic() && !abstract() && !isInterface();
 }
 
 FunctionDefinition const* ContractDefinition::fallbackFunction() const
@@ -153,12 +135,21 @@ FunctionDefinition const* ContractDefinition::fallbackFunction() const
 	return nullptr;
 }
 
+FunctionDefinition const* ContractDefinition::receiveFunction() const
+{
+	for (ContractDefinition const* contract: annotation().linearizedBaseContracts)
+		for (FunctionDefinition const* f: contract->definedFunctions())
+			if (f->isReceive())
+				return f;
+	return nullptr;
+}
+
 vector<EventDefinition const*> const& ContractDefinition::interfaceEvents() const
 {
 	if (!m_interfaceEvents)
 	{
 		set<string> eventsSeen;
-		m_interfaceEvents.reset(new vector<EventDefinition const*>());
+		m_interfaceEvents = make_unique<vector<EventDefinition const*>>();
 		for (ContractDefinition const* contract: annotation().linearizedBaseContracts)
 			for (EventDefinition const* e: contract->events())
 			{
@@ -178,18 +169,18 @@ vector<EventDefinition const*> const& ContractDefinition::interfaceEvents() cons
 	return *m_interfaceEvents;
 }
 
-vector<pair<FixedHash<4>, FunctionTypePointer>> const& ContractDefinition::interfaceFunctionList() const
+vector<pair<util::FixedHash<4>, FunctionTypePointer>> const& ContractDefinition::interfaceFunctionList() const
 {
 	if (!m_interfaceFunctionList)
 	{
 		set<string> signaturesSeen;
-		m_interfaceFunctionList.reset(new vector<pair<FixedHash<4>, FunctionTypePointer>>());
+		m_interfaceFunctionList = make_unique<vector<pair<util::FixedHash<4>, FunctionTypePointer>>>();
 		for (ContractDefinition const* contract: annotation().linearizedBaseContracts)
 		{
 			vector<FunctionTypePointer> functions;
 			for (FunctionDefinition const* f: contract->definedFunctions())
 				if (f->isPartOfExternalInterface())
-					functions.push_back(TypeProvider::function(*f, false));
+					functions.push_back(TypeProvider::function(*f, FunctionType::Kind::External));
 			for (VariableDeclaration const* v: contract->stateVariables())
 				if (v->isPartOfExternalInterface())
 					functions.push_back(TypeProvider::function(*v));
@@ -202,7 +193,7 @@ vector<pair<FixedHash<4>, FunctionTypePointer>> const& ContractDefinition::inter
 				if (signaturesSeen.count(functionSignature) == 0)
 				{
 					signaturesSeen.insert(functionSignature);
-					FixedHash<4> hash(dev::keccak256(functionSignature));
+					util::FixedHash<4> hash(util::keccak256(functionSignature));
 					m_interfaceFunctionList->emplace_back(hash, fun);
 				}
 			}
@@ -215,7 +206,7 @@ vector<Declaration const*> const& ContractDefinition::inheritableMembers() const
 {
 	if (!m_inheritableMembers)
 	{
-		m_inheritableMembers.reset(new vector<Declaration const*>());
+		m_inheritableMembers = make_unique<vector<Declaration const*>>();
 		auto addInheritableMember = [&](Declaration const* _decl)
 		{
 			solAssert(_decl, "addInheritableMember got a nullpointer.");
@@ -248,16 +239,12 @@ TypePointer ContractDefinition::type() const
 
 ContractDefinitionAnnotation& ContractDefinition::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new ContractDefinitionAnnotation();
-	return dynamic_cast<ContractDefinitionAnnotation&>(*m_annotation);
+	return initAnnotation<ContractDefinitionAnnotation>();
 }
 
 TypeNameAnnotation& TypeName::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new TypeNameAnnotation();
-	return dynamic_cast<TypeNameAnnotation&>(*m_annotation);
+	return initAnnotation<TypeNameAnnotation>();
 }
 
 TypePointer StructDefinition::type() const
@@ -267,9 +254,7 @@ TypePointer StructDefinition::type() const
 
 TypeDeclarationAnnotation& StructDefinition::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new TypeDeclarationAnnotation();
-	return dynamic_cast<TypeDeclarationAnnotation&>(*m_annotation);
+	return initAnnotation<TypeDeclarationAnnotation>();
 }
 
 TypePointer EnumValue::type() const
@@ -286,12 +271,10 @@ TypePointer EnumDefinition::type() const
 
 TypeDeclarationAnnotation& EnumDefinition::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new TypeDeclarationAnnotation();
-	return dynamic_cast<TypeDeclarationAnnotation&>(*m_annotation);
+	return initAnnotation<TypeDeclarationAnnotation>();
 }
 
-ContractDefinition::ContractKind FunctionDefinition::inContractKind() const
+ContractKind FunctionDefinition::inContractKind() const
 {
 	auto contractDef = dynamic_cast<ContractDefinition const*>(scope());
 	solAssert(contractDef, "Enclosing Scope of FunctionDefinition was not set.");
@@ -304,13 +287,13 @@ FunctionTypePointer FunctionDefinition::functionType(bool _internal) const
 	{
 		switch (visibility())
 		{
-		case Declaration::Visibility::Default:
+		case Visibility::Default:
 			solAssert(false, "visibility() should not return Default");
-		case Declaration::Visibility::Private:
-		case Declaration::Visibility::Internal:
-		case Declaration::Visibility::Public:
-			return TypeProvider::function(*this, _internal);
-		case Declaration::Visibility::External:
+		case Visibility::Private:
+		case Visibility::Internal:
+		case Visibility::Public:
+			return TypeProvider::function(*this, FunctionType::Kind::Internal);
+		case Visibility::External:
 			return {};
 		}
 	}
@@ -318,14 +301,14 @@ FunctionTypePointer FunctionDefinition::functionType(bool _internal) const
 	{
 		switch (visibility())
 		{
-		case Declaration::Visibility::Default:
+		case Visibility::Default:
 			solAssert(false, "visibility() should not return Default");
-		case Declaration::Visibility::Private:
-		case Declaration::Visibility::Internal:
+		case Visibility::Private:
+		case Visibility::Internal:
 			return {};
-		case Declaration::Visibility::Public:
-		case Declaration::Visibility::External:
-			return TypeProvider::function(*this, _internal);
+		case Visibility::Public:
+		case Visibility::External:
+			return TypeProvider::function(*this, FunctionType::Kind::External);
 		}
 	}
 
@@ -335,8 +318,8 @@ FunctionTypePointer FunctionDefinition::functionType(bool _internal) const
 
 TypePointer FunctionDefinition::type() const
 {
-	solAssert(visibility() != Declaration::Visibility::External, "");
-	return TypeProvider::function(*this);
+	solAssert(visibility() != Visibility::External, "");
+	return TypeProvider::function(*this, FunctionType::Kind::Internal);
 }
 
 string FunctionDefinition::externalSignature() const
@@ -344,11 +327,14 @@ string FunctionDefinition::externalSignature() const
 	return TypeProvider::function(*this)->externalSignature();
 }
 
+string FunctionDefinition::externalIdentifierHex() const
+{
+	return TypeProvider::function(*this)->externalIdentifierHex();
+}
+
 FunctionDefinitionAnnotation& FunctionDefinition::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new FunctionDefinitionAnnotation();
-	return dynamic_cast<FunctionDefinitionAnnotation&>(*m_annotation);
+	return initAnnotation<FunctionDefinitionAnnotation>();
 }
 
 TypePointer ModifierDefinition::type() const
@@ -358,9 +344,7 @@ TypePointer ModifierDefinition::type() const
 
 ModifierDefinitionAnnotation& ModifierDefinition::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new ModifierDefinitionAnnotation();
-	return dynamic_cast<ModifierDefinitionAnnotation&>(*m_annotation);
+	return initAnnotation<ModifierDefinitionAnnotation>();
 }
 
 TypePointer EventDefinition::type() const
@@ -378,16 +362,12 @@ FunctionTypePointer EventDefinition::functionType(bool _internal) const
 
 EventDefinitionAnnotation& EventDefinition::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new EventDefinitionAnnotation();
-	return dynamic_cast<EventDefinitionAnnotation&>(*m_annotation);
+	return initAnnotation<EventDefinitionAnnotation>();
 }
 
 UserDefinedTypeNameAnnotation& UserDefinedTypeName::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new UserDefinedTypeNameAnnotation();
-	return dynamic_cast<UserDefinedTypeNameAnnotation&>(*m_annotation);
+	return initAnnotation<UserDefinedTypeNameAnnotation>();
 }
 
 SourceUnit const& Scopable::sourceUnit() const
@@ -420,10 +400,20 @@ string Scopable::sourceUnitName() const
 	return sourceUnit().annotation().path;
 }
 
+DeclarationAnnotation& Declaration::annotation() const
+{
+	return initAnnotation<DeclarationAnnotation>();
+}
+
 bool VariableDeclaration::isLValue() const
 {
-	// External function parameters and constant declared variables are Read-Only
-	return !isExternalCallableParameter() && !m_isConstant;
+	// Constant declared variables are Read-Only
+	if (m_isConstant)
+		return false;
+	// External function arguments of reference type are Read-Only
+	if (isExternalCallableParameter() && dynamic_cast<ReferenceType const*>(type()))
+		return false;
+	return true;
 }
 
 bool VariableDeclaration::isLocalVariable() const
@@ -433,12 +423,13 @@ bool VariableDeclaration::isLocalVariable() const
 		dynamic_cast<FunctionTypeName const*>(s) ||
 		dynamic_cast<CallableDeclaration const*>(s) ||
 		dynamic_cast<Block const*>(s) ||
+		dynamic_cast<TryCatchClause const*>(s) ||
 		dynamic_cast<ForStatement const*>(s);
 }
 
-bool VariableDeclaration::isCallableParameter() const
+bool VariableDeclaration::isCallableOrCatchParameter() const
 {
-	if (isReturnParameter())
+	if (isReturnParameter() || isTryCatchParameter())
 		return true;
 
 	vector<ASTPointer<VariableDeclaration>> const* parameters = nullptr;
@@ -457,7 +448,7 @@ bool VariableDeclaration::isCallableParameter() const
 
 bool VariableDeclaration::isLocalOrReturn() const
 {
-	return isReturnParameter() || (isLocalVariable() && !isCallableParameter());
+	return isReturnParameter() || (isLocalVariable() && !isCallableOrCatchParameter());
 }
 
 bool VariableDeclaration::isReturnParameter() const
@@ -477,13 +468,18 @@ bool VariableDeclaration::isReturnParameter() const
 	return false;
 }
 
+bool VariableDeclaration::isTryCatchParameter() const
+{
+	return dynamic_cast<TryCatchClause const*>(scope());
+}
+
 bool VariableDeclaration::isExternalCallableParameter() const
 {
-	if (!isCallableParameter())
+	if (!isCallableOrCatchParameter())
 		return false;
 
 	if (auto const* callable = dynamic_cast<CallableDeclaration const*>(scope()))
-		if (callable->visibility() == Declaration::Visibility::External)
+		if (callable->visibility() == Visibility::External)
 			return !isReturnParameter();
 
 	return false;
@@ -491,19 +487,19 @@ bool VariableDeclaration::isExternalCallableParameter() const
 
 bool VariableDeclaration::isInternalCallableParameter() const
 {
-	if (!isCallableParameter())
+	if (!isCallableOrCatchParameter())
 		return false;
 
 	if (auto const* funTypeName = dynamic_cast<FunctionTypeName const*>(scope()))
-		return funTypeName->visibility() == Declaration::Visibility::Internal;
+		return funTypeName->visibility() == Visibility::Internal;
 	else if (auto const* callable = dynamic_cast<CallableDeclaration const*>(scope()))
-		return callable->visibility() <= Declaration::Visibility::Internal;
+		return callable->visibility() <= Visibility::Internal;
 	return false;
 }
 
 bool VariableDeclaration::isLibraryFunctionParameter() const
 {
-	if (!isCallableParameter())
+	if (!isCallableOrCatchParameter())
 		return false;
 	if (auto const* funDef = dynamic_cast<FunctionDefinition const*>(scope()))
 		return dynamic_cast<ContractDefinition const&>(*funDef->scope()).isLibrary();
@@ -539,10 +535,10 @@ set<VariableDeclaration::Location> VariableDeclaration::allowedDataLocations() c
 			locations.insert(Location::Storage);
 		return locations;
 	}
-	else if (isCallableParameter())
+	else if (isCallableOrCatchParameter())
 	{
 		set<Location> locations{ Location::Memory };
-		if (isInternalCallableParameter() || isLibraryFunctionParameter())
+		if (isInternalCallableParameter() || isLibraryFunctionParameter() || isTryCatchParameter())
 			locations.insert(Location::Storage);
 		return locations;
 	}
@@ -561,6 +557,12 @@ set<VariableDeclaration::Location> VariableDeclaration::allowedDataLocations() c
 		return set<Location>{ Location::Unspecified };
 }
 
+string VariableDeclaration::externalIdentifierHex() const
+{
+	solAssert(isStateVariable() && isPublic(), "Can only be called for public state variables");
+	return TypeProvider::function(*this)->externalIdentifierHex();
+}
+
 TypePointer VariableDeclaration::type() const
 {
 	return annotation().type;
@@ -572,13 +574,13 @@ FunctionTypePointer VariableDeclaration::functionType(bool _internal) const
 		return nullptr;
 	switch (visibility())
 	{
-	case Declaration::Visibility::Default:
+	case Visibility::Default:
 		solAssert(false, "visibility() should not return Default");
-	case Declaration::Visibility::Private:
-	case Declaration::Visibility::Internal:
+	case Visibility::Private:
+	case Visibility::Internal:
 		return nullptr;
-	case Declaration::Visibility::Public:
-	case Declaration::Visibility::External:
+	case Visibility::Public:
+	case Visibility::External:
 		return TypeProvider::function(*this);
 	}
 
@@ -588,65 +590,62 @@ FunctionTypePointer VariableDeclaration::functionType(bool _internal) const
 
 VariableDeclarationAnnotation& VariableDeclaration::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new VariableDeclarationAnnotation();
-	return dynamic_cast<VariableDeclarationAnnotation&>(*m_annotation);
+	return initAnnotation<VariableDeclarationAnnotation>();
 }
 
 StatementAnnotation& Statement::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new StatementAnnotation();
-	return dynamic_cast<StatementAnnotation&>(*m_annotation);
+	return initAnnotation<StatementAnnotation>();
 }
 
 InlineAssemblyAnnotation& InlineAssembly::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new InlineAssemblyAnnotation();
-	return dynamic_cast<InlineAssemblyAnnotation&>(*m_annotation);
+	return initAnnotation<InlineAssemblyAnnotation>();
+}
+
+BlockAnnotation& Block::annotation() const
+{
+	return initAnnotation<BlockAnnotation>();
+}
+
+TryCatchClauseAnnotation& TryCatchClause::annotation() const
+{
+	return initAnnotation<TryCatchClauseAnnotation>();
+}
+
+ForStatementAnnotation& ForStatement::annotation() const
+{
+	return initAnnotation<ForStatementAnnotation>();
 }
 
 ReturnAnnotation& Return::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new ReturnAnnotation();
-	return dynamic_cast<ReturnAnnotation&>(*m_annotation);
+	return initAnnotation<ReturnAnnotation>();
 }
 
 ExpressionAnnotation& Expression::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new ExpressionAnnotation();
-	return dynamic_cast<ExpressionAnnotation&>(*m_annotation);
+	return initAnnotation<ExpressionAnnotation>();
 }
 
 MemberAccessAnnotation& MemberAccess::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new MemberAccessAnnotation();
-	return dynamic_cast<MemberAccessAnnotation&>(*m_annotation);
+	return initAnnotation<MemberAccessAnnotation>();
 }
 
 BinaryOperationAnnotation& BinaryOperation::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new BinaryOperationAnnotation();
-	return dynamic_cast<BinaryOperationAnnotation&>(*m_annotation);
+	return initAnnotation<BinaryOperationAnnotation>();
 }
 
 FunctionCallAnnotation& FunctionCall::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new FunctionCallAnnotation();
-	return dynamic_cast<FunctionCallAnnotation&>(*m_annotation);
+	return initAnnotation<FunctionCallAnnotation>();
 }
 
 IdentifierAnnotation& Identifier::annotation() const
 {
-	if (!m_annotation)
-		m_annotation = new IdentifierAnnotation();
-	return dynamic_cast<IdentifierAnnotation&>(*m_annotation);
+	return initAnnotation<IdentifierAnnotation>();
 }
 
 ASTString Literal::valueWithoutUnderscores() const
@@ -675,7 +674,7 @@ bool Literal::looksLikeAddress() const
 bool Literal::passesAddressChecksum() const
 {
 	solAssert(isHexNumber(), "Expected hex number");
-	return dev::passesAddressChecksum(valueWithoutUnderscores(), true);
+	return util::passesAddressChecksum(valueWithoutUnderscores(), true);
 }
 
 string Literal::getChecksummedAddress() const
@@ -686,5 +685,5 @@ string Literal::getChecksummedAddress() const
 	if (address.length() > 40)
 		return string();
 	address.insert(address.begin(), 40 - address.size(), '0');
-	return dev::getChecksummedAddress(address);
+	return util::getChecksummedAddress(address);
 }

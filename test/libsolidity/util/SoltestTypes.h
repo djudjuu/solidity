@@ -14,14 +14,11 @@
 
 #pragma once
 
-#include <libdevcore/CommonData.h>
+#include <libsolutil/AnsiColorized.h>
+#include <libsolutil/CommonData.h>
 #include <libsolidity/ast/Types.h>
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 /**
@@ -57,6 +54,7 @@ namespace test
 	K(Boolean, "boolean", 0)       \
 	/* special keywords */         \
 	K(Left, "left", 0)             \
+	K(Library, "library", 0)       \
 	K(Right, "right", 0)           \
 	K(Failure, "FAILURE", 0)       \
 
@@ -111,9 +109,16 @@ struct ABIType
 		AlignRight,
 		AlignNone,
 	};
+
+	explicit ABIType(
+		Type _type,
+		Align _align = ABIType::AlignRight,
+		size_t _size = 32
+	): type(_type), align(_align), size(_size) {}
+
 	Type type = ABIType::None;
 	Align align = ABIType::AlignRight;
-	size_t size = 0;
+	size_t size = 32;
 	bool alignDeclared = false;
 };
 
@@ -130,7 +135,7 @@ struct FormatInfo
  * Parameter abstraction used for the encoding and decoding of
  * function parameter and expectation / return value lists.
  * A parameter list is usually a comma-separated list of literals.
- * It should not be possible to call create a parameter holding
+ * It should not be possible to create a parameter holding
  * an identifier, but if so, the ABI type would be invalid.
  */
 struct Parameter
@@ -154,12 +159,17 @@ struct Parameter
 	/// Types that were used to encode `rawBytes`. Expectations
 	/// are usually comma separated literals. Their type is auto-
 	/// detected and retained in order to format them later on.
-	ABIType abiType;
+	ABIType abiType = ABIType{ABIType::UnsignedDec, ABIType::AlignRight, 32};
 	/// Format info attached to the parameter. It handles newlines given
 	/// in the declaration of it.
 	FormatInfo format;
 	/// Stores the parsed alignment, which can be either left(...) or right(...).
 	Alignment alignment = Alignment::None;
+	/// Compares _bytes to the bytes stored in this object.
+	bool matchesBytes(bytes const& _bytes) const
+	{
+		return rawBytes == _bytes;
+	}
 };
 using ParameterList = std::vector<Parameter>;
 
@@ -249,8 +259,14 @@ struct FunctionCall
 	DisplayMode displayMode = DisplayMode::SingleLine;
 	/// Marks this function call as the constructor.
 	bool isConstructor = false;
+	/// If this function call's signature has no name and no arguments,
+	/// a low-level call with unstructured calldata will be issued.
+	bool useCallWithoutSignature = false;
+	/// Marks this function call as "short-handed", meaning
+	/// no `->` declared.
+	bool omitsArrow = true;
+	/// Marks a library deployment call.
+	bool isLibrary = false;
 };
 
-}
-}
 }

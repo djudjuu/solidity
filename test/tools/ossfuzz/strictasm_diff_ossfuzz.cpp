@@ -27,8 +27,8 @@
 #include <liblangutil/EVMVersion.h>
 #include <liblangutil/SourceReferenceFormatter.h>
 
-#include <libdevcore/CommonIO.h>
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonIO.h>
+#include <libsolutil/CommonData.h>
 
 #include <test/tools/ossfuzz/yulFuzzerCommon.h>
 
@@ -36,12 +36,12 @@
 #include <memory>
 #include <iostream>
 
-using namespace yul;
 using namespace std;
-
-using namespace langutil;
-using namespace dev;
-using namespace yul::test::yul_fuzzer;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
+using namespace solidity::langutil;
+using namespace solidity::yul::test::yul_fuzzer;
 
 extern "C" int LLVMFuzzerTestOneInput(uint8_t const* _data, size_t _size)
 {
@@ -60,7 +60,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t const* _data, size_t _size)
 	AssemblyStack stack(
 		langutil::EVMVersion(),
 		AssemblyStack::Language::StrictAssembly,
-		dev::solidity::OptimiserSettings::full()
+		solidity::frontend::OptimiserSettings::full()
 	);
 	try
 	{
@@ -78,35 +78,21 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t const* _data, size_t _size)
 
 	ostringstream os1;
 	ostringstream os2;
-	try
-	{
-		yulFuzzerUtil::interpret(
-			os1,
-			stack.parserResult()->code,
-			EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion())
-		);
-	}
-	catch (yul::test::StepLimitReached const&)
-	{
+	yulFuzzerUtil::TerminationReason termReason = yulFuzzerUtil::interpret(
+		os1,
+		stack.parserResult()->code,
+		EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion())
+	);
+	if (termReason == yulFuzzerUtil::TerminationReason::StepLimitReached)
 		return 0;
-	}
-	catch (yul::test::InterpreterTerminatedGeneric const&)
-	{
-	}
 
 	stack.optimize();
-	try
-	{
-		yulFuzzerUtil::interpret(
-			os2,
-			stack.parserResult()->code,
-			EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion()),
-			(yul::test::yul_fuzzer::yulFuzzerUtil::maxSteps * 1.5)
-		);
-	}
-	catch (yul::test::InterpreterTerminatedGeneric const&)
-	{
-	}
+	termReason = yulFuzzerUtil::interpret(
+		os2,
+		stack.parserResult()->code,
+		EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion()),
+		(yul::test::yul_fuzzer::yulFuzzerUtil::maxSteps * 4)
+	);
 
 	bool isTraceEq = (os1.str() == os2.str());
 	yulAssert(isTraceEq, "Interpreted traces for optimized and unoptimized code differ.");

@@ -27,8 +27,8 @@
 #include <string>
 #include <regex>
 
-using namespace yul;
 using namespace std;
+using namespace solidity::yul;
 
 VarNameCleaner::VarNameCleaner(
 	Block const& _ast,
@@ -40,8 +40,8 @@ VarNameCleaner::VarNameCleaner(
 	m_translatedNames{}
 {
 	for (auto const& statement: _ast.statements)
-		if (statement.type() == typeid(FunctionDefinition))
-			m_blacklist.insert(boost::get<FunctionDefinition>(statement).name);
+		if (holds_alternative<FunctionDefinition>(statement))
+			m_blacklist.insert(std::get<FunctionDefinition>(statement).name);
 	m_usedNames = m_blacklist;
 }
 

@@ -25,43 +25,46 @@
 #include <libyul/AsmData.h>
 #include <libyul/Utilities.h>
 
-#include <libdevcore/CommonData.h>
+#include <libsolutil/CommonData.h>
+
+#include <variant>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
 
 using Representation = ConstantOptimiser::Representation;
 
 namespace
 {
-struct MiniEVMInterpreter: boost::static_visitor<u256>
+struct MiniEVMInterpreter
 {
 	explicit MiniEVMInterpreter(EVMDialect const& _dialect): m_dialect(_dialect) {}
 
 	u256 eval(Expression const& _expr)
 	{
-		return boost::apply_visitor(*this, _expr);
+		return std::visit(*this, _expr);
 	}
 
-	u256 eval(dev::eth::Instruction _instr, vector<Expression> const& _arguments)
+	u256 eval(evmasm::Instruction _instr, vector<Expression> const& _arguments)
 	{
 		vector<u256> args;
 		for (auto const& arg: _arguments)
 			args.emplace_back(eval(arg));
 		switch (_instr)
 		{
-		case eth::Instruction::ADD:
+		case evmasm::Instruction::ADD:
 			return args.at(0) + args.at(1);
-		case eth::Instruction::SUB:
+		case evmasm::Instruction::SUB:
 			return args.at(0) - args.at(1);
-		case eth::Instruction::MUL:
+		case evmasm::Instruction::MUL:
 			return args.at(0) * args.at(1);
-		case eth::Instruction::EXP:
+		case evmasm::Instruction::EXP:
 			return exp256(args.at(0), args.at(1));
-		case eth::Instruction::SHL:
+		case evmasm::Instruction::SHL:
 			return args.at(0) > 255 ? 0 : (args.at(1) << unsigned(args.at(0)));
-		case eth::Instruction::NOT:
+		case evmasm::Instruction::NOT:
 			return ~args.at(0);
 		default:
 			yulAssert(false, "Invalid operation generated in constant optimizer.");
@@ -69,10 +72,6 @@ struct MiniEVMInterpreter: boost::static_visitor<u256>
 		return 0;
 	}
 
-	u256 operator()(FunctionalInstruction const& _instr)
-	{
-		return eval(_instr.instruction, _instr.arguments);
-	}
 	u256 operator()(FunctionCall const& _funCall)
 	{
 		BuiltinFunctionForEVM const* fun = m_dialect.builtin(_funCall.functionName.name);
@@ -92,9 +91,9 @@ struct MiniEVMInterpreter: boost::static_visitor<u256>
 
 void ConstantOptimiser::visit(Expression& _e)
 {
-	if (_e.type() == typeid(Literal))
+	if (holds_alternative<Literal>(_e))
 	{
-		Literal const& literal = boost::get<Literal>(_e);
+		Literal const& literal = std::get<Literal>(_e);
 		if (literal.kind != LiteralKind::Number)
 			return;
 
@@ -109,26 +108,26 @@ void ConstantOptimiser::visit(Expression& _e)
 		ASTModifier::visit(_e);
 }
 
-Expression const* RepresentationFinder::tryFindRepresentation(dev::u256 const& _value)
+Expression const* RepresentationFinder::tryFindRepresentation(u256 const& _value)
 {
 	if (_value < 0x10000)
 		return nullptr;
 
 	Representation const& repr = findRepresentation(_value);
-	if (repr.expression->type() == typeid(Literal))
+	if (holds_alternative<Literal>(*repr.expression))
 		return nullptr;
 	else
 		return repr.expression.get();
 }
 
-Representation const& RepresentationFinder::findRepresentation(dev::u256 const& _value)
+Representation const& RepresentationFinder::findRepresentation(u256 const& _value)
 {
 	if (m_cache.count(_value))
 		return m_cache.at(_value);
 
 	Representation routine = represent(_value);
 
-	if (dev::bytesRequired(~_value) < dev::bytesRequired(_value))
+	if (bytesRequired(~_value) < bytesRequired(_value))
 		// Negated is shorter to represent
 		routine = min(move(routine), represent("not"_yulstring, findRepresentation(~_value)));
 
@@ -177,7 +176,7 @@ Representation const& RepresentationFinder::findRepresentation(dev::u256 const& 
 	return m_cache[_value] = move(routine);
 }
 
-Representation RepresentationFinder::represent(dev::u256 const& _value) const
+Representation RepresentationFinder::represent(u256 const& _value) const
 {
 	Representation repr;
 	repr.expression = make_unique<Expression>(Literal{m_location, LiteralKind::Number, YulString{formatNumber(_value)}, {}});

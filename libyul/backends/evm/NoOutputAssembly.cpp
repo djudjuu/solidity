@@ -19,36 +19,36 @@
  */
 
 #include <libyul/backends/evm/NoOutputAssembly.h>
+#include <libyul/Exceptions.h>
 
 #include <libevmasm/Instruction.h>
 
-#include <liblangutil/Exceptions.h>
-
 using namespace std;
-using namespace dev;
-using namespace langutil;
-using namespace yul;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
+using namespace solidity::langutil;
 
 
-void NoOutputAssembly::appendInstruction(dev::eth::Instruction _instr)
+void NoOutputAssembly::appendInstruction(evmasm::Instruction _instr)
 {
 	m_stackHeight += instructionInfo(_instr).ret - instructionInfo(_instr).args;
 }
 
 void NoOutputAssembly::appendConstant(u256 const&)
 {
-	appendInstruction(dev::eth::pushInstruction(1));
+	appendInstruction(evmasm::pushInstruction(1));
 }
 
 void NoOutputAssembly::appendLabel(LabelID)
 {
-	appendInstruction(dev::eth::Instruction::JUMPDEST);
+	appendInstruction(evmasm::Instruction::JUMPDEST);
 }
 
 void NoOutputAssembly::appendLabelReference(LabelID)
 {
-	solAssert(!m_evm15, "Cannot use plain label references in EMV1.5 mode.");
-	appendInstruction(dev::eth::pushInstruction(1));
+	yulAssert(!m_evm15, "Cannot use plain label references in EMV1.5 mode.");
+	appendInstruction(evmasm::pushInstruction(1));
 }
 
 NoOutputAssembly::LabelID NoOutputAssembly::newLabelId()
@@ -63,13 +63,13 @@ AbstractAssembly::LabelID NoOutputAssembly::namedLabel(string const&)
 
 void NoOutputAssembly::appendLinkerSymbol(string const&)
 {
-	solAssert(false, "Linker symbols not yet implemented.");
+	yulAssert(false, "Linker symbols not yet implemented.");
 }
 
 void NoOutputAssembly::appendJump(int _stackDiffAfter)
 {
-	solAssert(!m_evm15, "Plain JUMP used for EVM 1.5");
-	appendInstruction(dev::eth::Instruction::JUMP);
+	yulAssert(!m_evm15, "Plain JUMP used for EVM 1.5");
+	appendInstruction(evmasm::Instruction::JUMP);
 	m_stackHeight += _stackDiffAfter;
 }
 
@@ -91,50 +91,50 @@ void NoOutputAssembly::appendJumpToIf(LabelID _labelId)
 	else
 	{
 		appendLabelReference(_labelId);
-		appendInstruction(dev::eth::Instruction::JUMPI);
+		appendInstruction(evmasm::Instruction::JUMPI);
 	}
 }
 
 void NoOutputAssembly::appendBeginsub(LabelID, int _arguments)
 {
-	solAssert(m_evm15, "BEGINSUB used for EVM 1.0");
-	solAssert(_arguments >= 0, "");
+	yulAssert(m_evm15, "BEGINSUB used for EVM 1.0");
+	yulAssert(_arguments >= 0, "");
 	m_stackHeight += _arguments;
 }
 
 void NoOutputAssembly::appendJumpsub(LabelID, int _arguments, int _returns)
 {
-	solAssert(m_evm15, "JUMPSUB used for EVM 1.0");
-	solAssert(_arguments >= 0 && _returns >= 0, "");
+	yulAssert(m_evm15, "JUMPSUB used for EVM 1.0");
+	yulAssert(_arguments >= 0 && _returns >= 0, "");
 	m_stackHeight += _returns - _arguments;
 }
 
 void NoOutputAssembly::appendReturnsub(int _returns, int _stackDiffAfter)
 {
-	solAssert(m_evm15, "RETURNSUB used for EVM 1.0");
-	solAssert(_returns >= 0, "");
+	yulAssert(m_evm15, "RETURNSUB used for EVM 1.0");
+	yulAssert(_returns >= 0, "");
 	m_stackHeight += _stackDiffAfter - _returns;
 }
 
 void NoOutputAssembly::appendAssemblySize()
 {
-	appendInstruction(dev::eth::Instruction::PUSH1);
+	appendInstruction(evmasm::Instruction::PUSH1);
 }
 
 pair<shared_ptr<AbstractAssembly>, AbstractAssembly::SubID> NoOutputAssembly::createSubAssembly()
 {
-	solAssert(false, "Sub assemblies not implemented.");
+	yulAssert(false, "Sub assemblies not implemented.");
 	return {};
 }
 
 void NoOutputAssembly::appendDataOffset(AbstractAssembly::SubID)
 {
-	appendInstruction(dev::eth::Instruction::PUSH1);
+	appendInstruction(evmasm::Instruction::PUSH1);
 }
 
 void NoOutputAssembly::appendDataSize(AbstractAssembly::SubID)
 {
-	appendInstruction(dev::eth::Instruction::PUSH1);
+	appendInstruction(evmasm::Instruction::PUSH1);
 }
 
 AbstractAssembly::SubID NoOutputAssembly::appendData(bytes const&)
@@ -153,7 +153,7 @@ NoOutputEVMDialect::NoOutputEVMDialect(EVMDialect const& _copyFrom):
 		{
 			_visitArguments();
 			for (size_t i = 0; i < parameters; i++)
-				_assembly.appendInstruction(dev::eth::Instruction::POP);
+				_assembly.appendInstruction(evmasm::Instruction::POP);
 
 			for (size_t i = 0; i < returns; i++)
 				_assembly.appendConstant(u256(0));

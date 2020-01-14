@@ -5,17 +5,16 @@ contract test {
 //     :test
 // [
 //   {
-//     "constant": false,
 //     "inputs":
 //     [
 //       {
+//         "internalType": "function (uint256) external returns (uint256)",
 //         "name": "x",
 //         "type": "function"
 //       }
 //     ],
 //     "name": "g",
 //     "outputs": [],
-//     "payable": false,
 //     "stateMutability": "nonpayable",
 //     "type": "function"
 //   }

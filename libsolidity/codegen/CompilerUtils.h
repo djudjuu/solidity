@@ -27,8 +27,7 @@
 #include <libsolidity/codegen/CompilerContext.h>
 #include <libsolidity/codegen/CompilerContext.h>
 
-namespace dev {
-namespace solidity {
+namespace solidity::frontend {
 
 class Type; // forward
 
@@ -66,6 +65,10 @@ public:
 	/// Stack pre: string data
 	/// Stack post:
 	void revertWithStringData(Type const& _argumentType);
+
+	/// Allocates a new array and copies the return data to it.
+	/// If the EVM does not support return data, creates an empty array.
+	void returnDataToArray();
 
 	/// Computes the absolute calldata offset of a tail given a base reference and the (absolute)
 	/// offset of the tail pointer. Performs bounds checks. If @a _type is a dynamically sized array it also
@@ -262,7 +265,7 @@ public:
 	/// Pops slots from the stack such that its height is _toHeight.
 	/// Adds jump to _jumpTo.
 	/// Readjusts the stack offset to the original value.
-	void popAndJump(unsigned _toHeight, eth::AssemblyItem const& _jumpTo);
+	void popAndJump(unsigned _toHeight, evmasm::AssemblyItem const& _jumpTo);
 
 	template <class T>
 	static unsigned sizeOnStack(std::vector<T> const& _variables);
@@ -321,5 +324,4 @@ unsigned CompilerUtils::sizeOnStack(std::vector<T> const& _variables)
 	return size;
 }
 
-}
 }

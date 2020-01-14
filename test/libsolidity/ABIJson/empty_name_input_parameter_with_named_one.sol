@@ -9,14 +9,15 @@ contract test {
 //     :test
 // [
 //   {
-//     "constant": false,
 //     "inputs":
 //     [
 //       {
+//         "internalType": "uint256",
 //         "name": "",
 //         "type": "uint256"
 //       },
 //       {
+//         "internalType": "uint256",
 //         "name": "k",
 //         "type": "uint256"
 //       }
@@ -25,15 +26,16 @@ contract test {
 //     "outputs":
 //     [
 //       {
+//         "internalType": "uint256",
 //         "name": "ret_k",
 //         "type": "uint256"
 //       },
 //       {
+//         "internalType": "uint256",
 //         "name": "ret_g",
 //         "type": "uint256"
 //       }
 //     ],
-//     "payable": false,
 //     "stateMutability": "nonpayable",
 //     "type": "function"
 //   }

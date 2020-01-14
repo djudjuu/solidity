@@ -27,18 +27,17 @@
 
 #include <libsolidity/interface/OptimiserSettings.h>
 
-#include <boost/optional.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
-#include <string>
 #include <memory>
+#include <optional>
+#include <string>
 
 using namespace std;
-using namespace langutil;
+using namespace solidity::frontend;
+using namespace solidity::langutil;
 
-namespace yul
-{
-namespace test
+namespace solidity::yul::test
 {
 
 namespace
@@ -49,9 +48,9 @@ std::pair<bool, ErrorList> parse(string const& _source)
 	try
 	{
 		AssemblyStack asmStack(
-			dev::test::Options::get().evmVersion(),
+			solidity::test::Options::get().evmVersion(),
 			AssemblyStack::Language::StrictAssembly,
-			dev::solidity::OptimiserSettings::none()
+			solidity::frontend::OptimiserSettings::none()
 		);
 		bool success = asmStack.parseAndAnalyze("source", _source);
 		return {success, asmStack.errors()};
@@ -63,7 +62,7 @@ std::pair<bool, ErrorList> parse(string const& _source)
 	return {false, {}};
 }
 
-boost::optional<Error> parseAndReturnFirstError(string const& _source, bool _allowWarnings = true)
+std::optional<Error> parseAndReturnFirstError(string const& _source, bool _allowWarnings = true)
 {
 	bool success;
 	ErrorList errors;
@@ -108,7 +107,7 @@ do \
 { \
 	Error err = expectError((text), false); \
 	BOOST_CHECK(err.type() == (Error::Type::typ)); \
-	BOOST_CHECK(dev::solidity::searchErrorMessage(err, (substring))); \
+	BOOST_CHECK(::solidity::frontend::test::searchErrorMessage(err, (substring))); \
 } while(0)
 
 BOOST_AUTO_TEST_SUITE(YulObjectParser)
@@ -240,9 +239,9 @@ BOOST_AUTO_TEST_CASE(to_string)
 )";
 	expectation = boost::replace_all_copy(expectation, "\t", "    ");
 	AssemblyStack asmStack(
-		dev::test::Options::get().evmVersion(),
+		solidity::test::Options::get().evmVersion(),
 		AssemblyStack::Language::StrictAssembly,
-		dev::solidity::OptimiserSettings::none()
+		solidity::frontend::OptimiserSettings::none()
 	);
 	BOOST_REQUIRE(asmStack.parseAndAnalyze("source", code));
 	BOOST_CHECK_EQUAL(asmStack.print(), expectation);
@@ -278,7 +277,19 @@ BOOST_AUTO_TEST_CASE(args_to_datacopy_are_arbitrary)
 	BOOST_CHECK(successParse(code));
 }
 
+
+BOOST_AUTO_TEST_CASE(non_existing_objects)
+{
+	BOOST_CHECK(successParse(
+		"object \"main\" { code { pop(datasize(\"main\")) } }"
+	));
+	CHECK_ERROR(
+		"object \"main\" { code { pop(datasize(\"abc\")) } }",
+		TypeError,
+		"Unknown data object"
+	);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
-}
 }

@@ -100,7 +100,8 @@ Grammar::
         Expression |
         Switch |
         ForLoop |
-        BreakContinue
+        BreakContinue |
+        Leave
     FunctionDefinition =
         'function' Identifier '(' TypedIdentifierList? ')'
         ( '->' TypedIdentifierList )? Block
@@ -122,6 +123,7 @@ Grammar::
         'for' Block Expression Block Block
     BreakContinue =
         'break' | 'continue'
+    Leave = 'leave'
     FunctionCall =
         Identifier '(' ( Expression ( ',' Expression )* )? ')'
     Identifier = [a-zA-Z_$] [a-zA-Z_$0-9.]*
@@ -167,8 +169,9 @@ In all other situations, expressions have to evaluate to exactly one value.
 The ``continue`` and ``break`` statements can only be used inside loop bodies
 and have to be in the same function as the loop (or both have to be at the
 top level).
+The ``leave`` statement can only be used inside a function.
 The condition part of the for-loop has to evaluate to exactly one value.
-Functions cannot be defined inside for loop init blocks.
+Functions cannot be defined anywhere inside for loop init blocks.
 
 Literals cannot be larger than the their type. The largest type defined is 256-bit wide.
 
@@ -182,11 +185,17 @@ introduce new identifiers into these scopes.
 
 Identifiers are visible in
 the block they are defined in (including all sub-nodes and sub-blocks).
-As an exception, identifiers defined in the "init" part of the for-loop
+
+As an exception, identifiers defined directly in the "init" part of the for-loop
 (the first block) are visible in all other parts of the for-loop
 (but not outside of the loop).
 Identifiers declared in the other parts of the for loop respect the regular
 syntactical scoping rules.
+
+This means a for-loop of the form ``for { I... } C { P... } { B... }`` is equivalent
+to ``{ I... for {} C { P... } { B... } }``.
+
+
 The parameters and return parameters of functions are visible in the
 function body and their names cannot overlap.
 
@@ -214,7 +223,7 @@ The two state objects are the global state object
 blockchain) and the local state object (the state of local variables, i.e. a
 segment of the stack in the EVM).
 If the AST node is a statement, E returns the two state objects and a "mode",
-which is used for the ``break`` and ``continue`` statements.
+which is used for the ``break``, ``continue`` and ``leave`` statements.
 If the AST node is an expression, E returns the two state objects and
 as many values as the expression evaluates to.
 
@@ -244,23 +253,24 @@ We will use a destructuring notation for the AST nodes.
                 G1, L1, mode
     E(G, L, FunctionDefinition) =
         G, L, regular
-    E(G, L, <let var1, ..., varn := rhs>: VariableDeclaration) =
-        E(G, L, <var1, ..., varn := rhs>: Assignment)
-    E(G, L, <let var1, ..., varn>: VariableDeclaration) =
-        let L1 be a copy of L where L1[$vari] = 0 for i = 1, ..., n
+    E(G, L, <let var_1, ..., var_n := rhs>: VariableDeclaration) =
+        E(G, L, <var_1, ..., var_n := rhs>: Assignment)
+    E(G, L, <let var_1, ..., var_n>: VariableDeclaration) =
+        let L1 be a copy of L where L1[$var_i] = 0 for i = 1, ..., n
         G, L1, regular
-    E(G, L, <var1, ..., varn := rhs>: Assignment) =
+    E(G, L, <var_1, ..., var_n := rhs>: Assignment) =
         let G1, L1, v1, ..., vn = E(G, L, rhs)
-        let L2 be a copy of L1 where L2[$vari] = vi for i = 1, ..., n
+        let L2 be a copy of L1 where L2[$var_i] = vi for i = 1, ..., n
         G, L2, regular
     E(G, L, <for { i1, ..., in } condition post body>: ForLoop) =
         if n >= 1:
-            let G1, L1, mode = E(G, L, i1, ..., in)
-            // mode has to be regular due to the syntactic restrictions
-            let G2, L2, mode = E(G1, L1, for {} condition post body)
-            // mode has to be regular due to the syntactic restrictions
-            let L3 be the restriction of L2 to only variables of L
-            G2, L3, regular
+            let G1, L, mode = E(G, L, i1, ..., in)
+            // mode has to be regular or leave due to the syntactic restrictions
+            if mode is leave then
+                G1, L1 restricted to variables of L, leave
+            otherwise
+                let G2, L2, mode = E(G1, L1, for {} condition post body)
+                G2, L2 restricted to variables of L, mode
         else:
             let G1, L1, v = E(G, L, condition)
             if v is false:
@@ -269,13 +279,20 @@ We will use a destructuring notation for the AST nodes.
                 let G2, L2, mode = E(G1, L, body)
                 if mode is break:
                     G2, L2, regular
+                otherwise if mode is leave:
+                    G2, L2, leave
                 else:
                     G3, L3, mode = E(G2, L2, post)
-                    E(G3, L3, for {} condition post body)
+                    if mode is leave:
+                        G2, L3, leave
+                    otherwise
+                        E(G3, L3, for {} condition post body)
     E(G, L, break: BreakContinue) =
         G, L, break
     E(G, L, continue: BreakContinue) =
         G, L, continue
+    E(G, L, leave: Leave) =
+        G, L, leave
     E(G, L, <if condition body>: If) =
         let G0, L0, v = E(G, L, condition)
         if v is true:

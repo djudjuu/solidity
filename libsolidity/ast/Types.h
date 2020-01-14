@@ -27,21 +27,19 @@
 #include <libsolidity/parsing/Token.h>
 #include <liblangutil/Exceptions.h>
 
-#include <libdevcore/Common.h>
-#include <libdevcore/CommonIO.h>
-#include <libdevcore/Result.h>
+#include <libsolutil/Common.h>
+#include <libsolutil/CommonIO.h>
+#include <libsolutil/Result.h>
 
-#include <boost/optional.hpp>
 #include <boost/rational.hpp>
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class TypeProvider;
@@ -50,9 +48,9 @@ class FunctionType; // forward
 using TypePointer = Type const*;
 using FunctionTypePointer = FunctionType const*;
 using TypePointers = std::vector<TypePointer>;
-using rational = boost::rational<dev::bigint>;
-using TypeResult = Result<TypePointer>;
-using BoolResult = Result<bool>;
+using rational = boost::rational<bigint>;
+using TypeResult = util::Result<TypePointer>;
+using BoolResult = util::Result<bool>;
 
 inline rational makeRational(bigint const& _numerator, bigint const& _denominator)
 {
@@ -161,7 +159,7 @@ public:
 
 	enum class Category
 	{
-		Address, Integer, RationalNumber, StringLiteral, Bool, FixedPoint, Array,
+		Address, Integer, RationalNumber, StringLiteral, Bool, FixedPoint, Array, ArraySlice,
 		FixedBytes, Contract, Struct, Function, Enum, Tuple,
 		Mapping, TypeType, Modifier, Magic, Module,
 		InaccessibleDynamic
@@ -208,16 +206,32 @@ public:
 	virtual bool operator==(Type const& _other) const { return category() == _other.category(); }
 	virtual bool operator!=(Type const& _other) const { return !this->operator ==(_other); }
 
-	/// @returns number of bytes used by this type when encoded for CALL. If it is a dynamic type,
-	/// returns the size of the pointer (usually 32). Returns 0 if the type cannot be encoded
-	/// in calldata.
+	/// @returns number of bytes used by this type when encoded for CALL. Cannot be used for
+	/// dynamically encoded types.
+	/// Always returns a value greater than zero and throws if the type cannot be encoded in calldata
+	/// (or is dynamically encoded).
 	/// If @a _padded then it is assumed that each element is padded to a multiple of 32 bytes.
-	virtual unsigned calldataEncodedSize(bool _padded) const { (void)_padded; return 0; }
+	virtual unsigned calldataEncodedSize([[maybe_unused]] bool _padded) const { solAssert(false, ""); }
+	/// Convenience version of @see calldataEncodedSize(bool)
+	unsigned calldataEncodedSize() const { return calldataEncodedSize(true); }
+	/// @returns the distance between two elements of this type in a calldata array, tuple or struct.
+	/// For statically encoded types this is the same as calldataEncodedSize(true).
+	/// For dynamically encoded types this is the distance between two tail pointers, i.e. 32.
+	/// Always returns a value greater than zero and throws if the type cannot be encoded in calldata.
+	unsigned calldataHeadSize() const { return isDynamicallyEncoded() ? 32 : calldataEncodedSize(true); }
+	/// @returns the (minimal) size of the calldata tail for this type. Can only be used for
+	/// dynamically encoded types. For dynamically-sized arrays this is 32 (the size of the length),
+	/// for statically-sized, but dynamically encoded arrays this is 32*length(), for structs
+	/// this is the sum of the calldataHeadSize's of its members.
+	/// Always returns a value greater than zero and throws if the type cannot be encoded in calldata
+	/// (or is not dynamically encoded).
+	virtual unsigned calldataEncodedTailSize() const { solAssert(false, ""); }
 	/// @returns the size of this data type in bytes when stored in memory. For memory-reference
 	/// types, this is the size of the memory pointer.
 	virtual unsigned memoryHeadSize() const { return calldataEncodedSize(); }
-	/// Convenience version of @see calldataEncodedSize(bool)
-	unsigned calldataEncodedSize() const { return calldataEncodedSize(true); }
+	/// @returns the size of this data type in bytes when stored in memory. For memory-reference
+	/// types, this is the size of the actual data area, if it is statically-sized.
+	virtual u256 memoryDataSize() const { return calldataEncodedSize(); }
 	/// @returns true if the type is a dynamic array
 	virtual bool isDynamicallySized() const { return false; }
 	/// @returns true if the type is dynamically encoded in the ABI
@@ -523,7 +537,7 @@ private:
 
 	/// @returns a truncated readable representation of the bigint keeping only
 	/// up to 4 leading and 4 trailing digits.
-	static std::string bigintToReadableString(dev::bigint const& num);
+	static std::string bigintToReadableString(bigint const& num);
 };
 
 /**
@@ -583,7 +597,7 @@ public:
 	bool leftAligned() const override { return true; }
 	bool isValueType() const override { return true; }
 
-	std::string toString(bool) const override { return "bytes" + dev::toString(m_bytes); }
+	std::string toString(bool) const override { return "bytes" + util::toString(m_bytes); }
 	MemberList::MemberMap nativeMembers(ContractDefinition const*) const override;
 	TypePointer encodingType() const override { return this; }
 	TypeResult interfaceType(bool) const override { return this; }
@@ -634,6 +648,10 @@ public:
 		return nullptr;
 	}
 	unsigned memoryHeadSize() const override { return 32; }
+	u256 memoryDataSize() const override = 0;
+
+	unsigned calldataEncodedSize(bool) const override = 0;
+	unsigned calldataEncodedTailSize() const override = 0;
 
 	/// @returns a copy of this type with location (recursively) changed to @a _location,
 	/// whereas isPointer is only shallowly changed - the deep copy is always a bound reference.
@@ -701,7 +719,8 @@ public:
 	BoolResult isExplicitlyConvertibleTo(Type const& _convertTo) const override;
 	std::string richIdentifier() const override;
 	bool operator==(Type const& _other) const override;
-	unsigned calldataEncodedSize(bool _padded) const override;
+	unsigned calldataEncodedSize(bool) const override;
+	unsigned calldataEncodedTailSize() const override;
 	bool isDynamicallySized() const override { return m_hasDynamicLength; }
 	bool isDynamicallyEncoded() const override;
 	u256 storageSize() const override;
@@ -724,12 +743,12 @@ public:
 	bool isString() const { return m_arrayKind == ArrayKind::String; }
 	Type const* baseType() const { solAssert(!!m_baseType, ""); return m_baseType; }
 	u256 const& length() const { return m_length; }
-	u256 memorySize() const;
+	u256 memoryDataSize() const override;
 
 	std::unique_ptr<ReferenceType> copyForLocation(DataLocation _location, bool _isPointer) const override;
 
 	/// The offset to advance in calldata to move from one array element to the next.
-	unsigned calldataStride() const { return isByteArray() ? 1 : m_baseType->calldataEncodedSize(); }
+	unsigned calldataStride() const { return isByteArray() ? 1 : m_baseType->calldataHeadSize(); }
 	/// The offset to advance in memory to move from one array element to the next.
 	unsigned memoryStride() const { return isByteArray() ? 1 : m_baseType->memoryHeadSize(); }
 	/// The offset to advance in storage to move from one array element to the next.
@@ -741,15 +760,44 @@ private:
 	/// String is interpreted as a subtype of Bytes.
 	enum class ArrayKind { Ordinary, Bytes, String };
 
-	bigint unlimitedCalldataEncodedSize(bool _padded) const;
+	bigint unlimitedStaticCalldataSize(bool _padded) const;
 
 	///< Byte arrays ("bytes") and strings have different semantics from ordinary arrays.
 	ArrayKind m_arrayKind = ArrayKind::Ordinary;
 	Type const* m_baseType;
 	bool m_hasDynamicLength = true;
 	u256 m_length;
-	mutable boost::optional<TypeResult> m_interfaceType;
-	mutable boost::optional<TypeResult> m_interfaceType_library;
+	mutable std::optional<TypeResult> m_interfaceType;
+	mutable std::optional<TypeResult> m_interfaceType_library;
+};
+
+class ArraySliceType: public ReferenceType
+{
+public:
+	explicit ArraySliceType(ArrayType const& _arrayType): ReferenceType(_arrayType.location()), m_arrayType(_arrayType) {}
+	Category category() const override { return Category::ArraySlice; }
+
+	BoolResult isImplicitlyConvertibleTo(Type const& _other) const override;
+	std::string richIdentifier() const override;
+	bool operator==(Type const& _other) const override;
+	unsigned calldataEncodedSize(bool) const override { solAssert(false, ""); }
+	unsigned calldataEncodedTailSize() const override { return 32; }
+	bool isDynamicallySized() const override { return true; }
+	bool isDynamicallyEncoded() const override { return true; }
+	bool canLiveOutsideStorage() const override { return m_arrayType.canLiveOutsideStorage(); }
+	unsigned sizeOnStack() const override { return 2; }
+	std::string toString(bool _short) const override;
+
+	/// @returns true if this is valid to be stored in calldata
+	bool validForCalldata() const { return m_arrayType.validForCalldata(); }
+
+	ArrayType const& arrayType() const { return m_arrayType; }
+	u256 memoryDataSize() const override { solAssert(false, ""); }
+
+	std::unique_ptr<ReferenceType> copyForLocation(DataLocation, bool) const override { solAssert(false, ""); }
+
+private:
+	ArrayType const& m_arrayType;
 };
 
 /**
@@ -796,7 +844,8 @@ public:
 	/// See documentation of m_super
 	bool isSuper() const { return m_super; }
 
-	// @returns true if and only if the contract has a payable fallback function
+	// @returns true if and only if the contract has a receive ether function or a payable fallback function, i.e.
+	// if it has code that will be executed on plain ether transfers
 	bool isPayable() const;
 
 	ContractDefinition const& contractDefinition() const { return m_contract; }
@@ -829,9 +878,10 @@ public:
 	BoolResult isImplicitlyConvertibleTo(Type const& _convertTo) const override;
 	std::string richIdentifier() const override;
 	bool operator==(Type const& _other) const override;
-	unsigned calldataEncodedSize(bool _padded) const override;
+	unsigned calldataEncodedSize(bool) const override;
+	unsigned calldataEncodedTailSize() const override;
 	bool isDynamicallyEncoded() const override;
-	u256 memorySize() const;
+	u256 memoryDataSize() const override;
 	u256 storageSize() const override;
 	bool canLiveOutsideStorage() const override { return true; }
 	std::string toString(bool _short) const override;
@@ -843,12 +893,12 @@ public:
 
 	bool recursive() const
 	{
-		if (m_recursive.is_initialized())
-			return m_recursive.get();
+		if (m_recursive.has_value())
+			return m_recursive.value();
 
 		interfaceType(false);
 
-		return m_recursive.get();
+		return m_recursive.value();
 	}
 
 	std::unique_ptr<ReferenceType> copyForLocation(DataLocation _location, bool _isPointer) const override;
@@ -876,9 +926,9 @@ public:
 private:
 	StructDefinition const& m_struct;
 	// Caches for interfaceType(bool)
-	mutable boost::optional<TypeResult> m_interfaceType;
-	mutable boost::optional<TypeResult> m_interfaceType_library;
-	mutable boost::optional<bool> m_recursive;
+	mutable std::optional<TypeResult> m_interfaceType;
+	mutable std::optional<TypeResult> m_interfaceType_library;
+	mutable std::optional<bool> m_recursive;
 };
 
 /**
@@ -1001,11 +1051,16 @@ public:
 		ABIEncodeWithSignature,
 		ABIDecode,
 		GasLeft, ///< gasleft()
-		MetaType ///< type(...)
+		MetaType, ///< type(...)
+		/// Refers to a function declaration without calling context
+		/// (i.e. when accessed directly via the name of the containing contract).
+		/// Cannot be called.
+		Declaration
 	};
 
 	/// Creates the type of a function.
-	explicit FunctionType(FunctionDefinition const& _function, bool _isInternal = true);
+	/// @arg _kind must be Kind::Internal, Kind::External or Kind::Declaration.
+	explicit FunctionType(FunctionDefinition const& _function, Kind _kind = Kind::Declaration);
 	/// Creates the accessor function type of a state variable.
 	explicit FunctionType(VariableDeclaration const& _varDecl);
 	/// Creates the function type of an event.
@@ -1016,7 +1071,7 @@ public:
 	FunctionType(
 		strings const& _parameterTypes,
 		strings const& _returnParameterTypes,
-		Kind _kind = Kind::Internal,
+		Kind _kind,
 		bool _arbitraryParameters = false,
 		StateMutability _stateMutability = StateMutability::NonPayable
 	): FunctionType(
@@ -1138,6 +1193,8 @@ public:
 	std::string externalSignature() const;
 	/// @returns the external identifier of this function (the hash of the signature).
 	u256 externalIdentifier() const;
+	/// @returns the external identifier of this function (the hash of the signature) as a hex string.
+	std::string externalIdentifierHex() const;
 	Declaration const& declaration() const
 	{
 		solAssert(m_declaration, "Requested declaration from a FunctionType that has none");
@@ -1265,6 +1322,7 @@ public:
 	std::string toString(bool _short) const override { return "type(" + m_actualType->toString(_short) + ")"; }
 	MemberList::MemberMap nativeMembers(ContractDefinition const* _currentScope) const override;
 
+	BoolResult isExplicitlyConvertibleTo(Type const& _convertTo) const override;
 private:
 	TypePointer m_actualType;
 };
@@ -1379,7 +1437,7 @@ public:
 	BoolResult isImplicitlyConvertibleTo(Type const&) const override { return false; }
 	BoolResult isExplicitlyConvertibleTo(Type const&) const override { return false; }
 	TypeResult binaryOperatorResult(Token, Type const*) const override { return nullptr; }
-	unsigned calldataEncodedSize(bool _padded) const override { (void)_padded; return 32; }
+	unsigned calldataEncodedSize(bool) const override { return 32; }
 	bool canBeStored() const override { return false; }
 	bool canLiveOutsideStorage() const override { return false; }
 	bool isValueType() const override { return true; }
@@ -1389,5 +1447,4 @@ public:
 	TypePointer decodingType() const override;
 };
 
-}
 }

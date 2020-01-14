@@ -5,14 +5,15 @@ contract test {
 //     :test
 // [
 //   {
-//     "constant": false,
 //     "inputs":
 //     [
 //       {
+//         "internalType": "uint256",
 //         "name": "a",
 //         "type": "uint256"
 //       },
 //       {
+//         "internalType": "uint256",
 //         "name": "b",
 //         "type": "uint256"
 //       }
@@ -21,11 +22,11 @@ contract test {
 //     "outputs":
 //     [
 //       {
+//         "internalType": "uint256",
 //         "name": "d",
 //         "type": "uint256"
 //       }
 //     ],
-//     "payable": false,
 //     "stateMutability": "nonpayable",
 //     "type": "function"
 //   }

@@ -27,12 +27,15 @@
 
 #include <libevmasm/Instruction.h>
 
-#include <libdevcore/Keccak256.h>
+#include <libsolutil/Keccak256.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
-using namespace yul::test;
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::yul::test;
+
+using solidity::util::h256;
+using solidity::util::keccak256;
 
 namespace
 {
@@ -63,13 +66,11 @@ u256 readZeroExtended(bytes const& _data, u256 const& _offset)
 /// Copy @a _size bytes of @a _source at offset @a _sourceOffset to
 /// @a _target at offset @a _targetOffset. Behaves as if @a _source would
 /// continue with an infinite sequence of zero bytes beyond its end.
-/// Asserts the target is large enough to hold the copied segment.
 void copyZeroExtended(
-	bytes& _target, bytes const& _source,
+	map<u256, uint8_t>& _target, bytes const& _source,
 	size_t _targetOffset, size_t _sourceOffset, size_t _size
 )
 {
-	yulAssert(_targetOffset + _size <= _target.size(), "");
 	for (size_t i = 0; i < _size; ++i)
 		_target[_targetOffset + i] = _sourceOffset + i < _source.size() ? _source[_sourceOffset + i] : 0;
 }
@@ -79,12 +80,12 @@ void copyZeroExtended(
 using u512 = boost::multiprecision::number<boost::multiprecision::cpp_int_backend<512, 256, boost::multiprecision::unsigned_magnitude, boost::multiprecision::unchecked, void>>;
 
 u256 EVMInstructionInterpreter::eval(
-	dev::eth::Instruction _instruction,
+	evmasm::Instruction _instruction,
 	vector<u256> const& _arguments
 )
 {
-	using namespace dev::eth;
-	using dev::eth::Instruction;
+	using namespace solidity::evmasm;
+	using evmasm::Instruction;
 
 	auto info = instructionInfo(_instruction);
 	yulAssert(size_t(info.args) == _arguments.size(), "");
@@ -176,12 +177,14 @@ u256 EVMInstructionInterpreter::eval(
 			return u256("0x1234cafe1234cafe1234cafe") + arg[0];
 		uint64_t offset = uint64_t(arg[0] & uint64_t(-1));
 		uint64_t size = uint64_t(arg[1] & uint64_t(-1));
-		return u256(keccak256(bytesConstRef(m_state.memory.data() + offset, size)));
+		return u256(keccak256(readMemory(offset, size)));
 	}
 	case Instruction::ADDRESS:
 		return m_state.address;
 	case Instruction::BALANCE:
 		return m_state.balance;
+	case Instruction::SELFBALANCE:
+		return m_state.selfbalance;
 	case Instruction::ORIGIN:
 		return m_state.origin;
 	case Instruction::CALLER:
@@ -210,6 +213,8 @@ u256 EVMInstructionInterpreter::eval(
 		return 0;
 	case Instruction::GASPRICE:
 		return m_state.gasprice;
+	case Instruction::CHAINID:
+		return m_state.chainid;
 	case Instruction::EXTCODESIZE:
 		return u256(keccak256(h256(arg[0]))) & 0xffffff;
 	case Instruction::EXTCODEHASH:
@@ -250,17 +255,15 @@ u256 EVMInstructionInterpreter::eval(
 		return m_state.gaslimit;
 	// --------------- memory / storage / logs ---------------
 	case Instruction::MLOAD:
-		if (accessMemory(arg[0], 0x20))
-			return u256(*reinterpret_cast<h256 const*>(m_state.memory.data() + size_t(arg[0])));
-		else
-			return 0x1234 + arg[0];
+		accessMemory(arg[0], 0x20);
+		return readMemoryWord(arg[0]);
 	case Instruction::MSTORE:
-		if (accessMemory(arg[0], 0x20))
-			*reinterpret_cast<h256*>(m_state.memory.data() + size_t(arg[0])) = h256(arg[1]);
+		accessMemory(arg[0], 0x20);
+		writeMemoryWord(arg[0], arg[1]);
 		return 0;
 	case Instruction::MSTORE8:
-		if (accessMemory(arg[0], 1))
-			m_state.memory[size_t(arg[0])] = uint8_t(arg[1] & 0xff);
+		accessMemory(arg[0], 1);
+		m_state.memory[arg[0]] = uint8_t(arg[1] & 0xff);
 		return 0;
 	case Instruction::SLOAD:
 		return m_state.storage[h256(arg[0])];
@@ -319,7 +322,7 @@ u256 EVMInstructionInterpreter::eval(
 	{
 		bytes data;
 		if (accessMemory(arg[0], arg[1]))
-			data = bytesConstRef(m_state.memory.data() + size_t(arg[0]), size_t(arg[1])).toBytes();
+			data = readMemory(arg[0], arg[1]);
 		logTrace(_instruction, arg, data);
 		throw ExplicitlyTerminated();
 	}
@@ -455,12 +458,7 @@ bool EVMInstructionInterpreter::accessMemory(u256 const& _offset, u256 const& _s
 	{
 		u256 newSize = (_offset + _size + 0x1f) & ~u256(0x1f);
 		m_state.msize = max(m_state.msize, newSize);
-		if (newSize < m_state.maxMemSize)
-		{
-			if (m_state.memory.size() < newSize)
-				m_state.memory.resize(size_t(newSize));
-			return true;
-		}
+		return _size <= 0xffff;
 	}
 	else
 		m_state.msize = u256(-1);
@@ -468,19 +466,40 @@ bool EVMInstructionInterpreter::accessMemory(u256 const& _offset, u256 const& _s
 	return false;
 }
 
-void EVMInstructionInterpreter::logTrace(dev::eth::Instruction _instruction, std::vector<u256> const& _arguments, bytes const& _data)
+bytes EVMInstructionInterpreter::readMemory(u256 const& _offset, u256 const& _size)
 {
-	logTrace(dev::eth::instructionInfo(_instruction).name, _arguments, _data);
+	yulAssert(_size <= 0xffff, "Too large read.");
+	bytes data(size_t(_size), uint8_t(0));
+	for (size_t i = 0; i < data.size(); ++i)
+		data[i] = m_state.memory[_offset + i];
+	return data;
+}
+
+u256 EVMInstructionInterpreter::readMemoryWord(u256 const& _offset)
+{
+	return u256(h256(readMemory(_offset, 32)));
+}
+
+void EVMInstructionInterpreter::writeMemoryWord(u256 const& _offset, u256 const& _value)
+{
+	for (size_t i = 0; i < 32; i++)
+		m_state.memory[_offset + i] = uint8_t((_value >> (8 * (31 - i))) & 0xff);
+}
+
+
+void EVMInstructionInterpreter::logTrace(evmasm::Instruction _instruction, std::vector<u256> const& _arguments, bytes const& _data)
+{
+	logTrace(evmasm::instructionInfo(_instruction).name, _arguments, _data);
 }
 
 void EVMInstructionInterpreter::logTrace(std::string const& _pseudoInstruction, std::vector<u256> const& _arguments, bytes const& _data)
 {
 	string message = _pseudoInstruction + "(";
 	for (size_t i = 0; i < _arguments.size(); ++i)
-		message += (i > 0 ? ", " : "") + formatNumber(_arguments[i]);
+		message += (i > 0 ? ", " : "") + util::formatNumber(_arguments[i]);
 	message += ")";
 	if (!_data.empty())
-		message += " [" + toHex(_data) + "]";
+		message += " [" + util::toHex(_data) + "]";
 	m_state.trace.emplace_back(std::move(message));
 	if (m_state.maxTraceSize > 0 && m_state.trace.size() >= m_state.maxTraceSize)
 	{

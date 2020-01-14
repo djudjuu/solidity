@@ -26,15 +26,16 @@
 #include <map>
 #include <set>
 
-namespace yul
+namespace solidity::yul
 {
 struct Dialect;
+struct OptimiserStepContext;
 
 /**
  * Optimisation stage that removes unreachable code
  *
  * Unreachable code is any code within a block which is preceded by a
- * return, invalid, break, continue, selfdestruct or revert.
+ * leave, return, invalid, break, continue, selfdestruct or revert.
  *
  * Function definitions are retained as they might be called by earlier
  * code and thus are considered reachable.
@@ -47,13 +48,16 @@ struct Dialect;
 class DeadCodeEliminator: public ASTModifier
 {
 public:
-	DeadCodeEliminator(Dialect const& _dialect): m_dialect(_dialect) {}
+	static constexpr char const* name{"DeadCodeEliminator"};
+	static void run(OptimiserStepContext&, Block& _ast);
 
 	using ASTModifier::operator();
 	void operator()(ForLoop& _for) override;
 	void operator()(Block& _block) override;
 
 private:
+	DeadCodeEliminator(Dialect const& _dialect): m_dialect(_dialect) {}
+
 	Dialect const& m_dialect;
 };
 

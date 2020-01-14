@@ -27,24 +27,22 @@
 #include <libsolidity/formal/SymbolicVariables.h>
 #include <libsolidity/formal/VariableUsage.h>
 
+#include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/ASTVisitor.h>
 #include <libsolidity/interface/ReadFile.h>
 #include <liblangutil/ErrorReporter.h>
-#include <liblangutil/Scanner.h>
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-namespace langutil
+namespace solidity::langutil
 {
 class ErrorReporter;
 struct SourceLocation;
 }
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class SMTEncoder: public ASTConstVisitor
@@ -54,6 +52,10 @@ public:
 
 	/// @returns the leftmost identifier in a multi-d IndexAccess.
 	static Expression const* leftmostBase(IndexAccess const& _indexAccess);
+
+	/// @returns the FunctionDefinition of a FunctionCall
+	/// if possible or nullptr.
+	static FunctionDefinition const* functionCallToDefinition(FunctionCall const& _funCall);
 
 protected:
 	// TODO: Check that we do not have concurrent reads and writes to a variable,
@@ -78,12 +80,17 @@ protected:
 	bool visit(BinaryOperation const& _node) override;
 	void endVisit(BinaryOperation const& _node) override;
 	void endVisit(FunctionCall const& _node) override;
+	bool visit(ModifierInvocation const& _node) override;
 	void endVisit(Identifier const& _node) override;
+	void endVisit(ElementaryTypeNameExpression const& _node) override;
 	void endVisit(Literal const& _node) override;
 	void endVisit(Return const& _node) override;
 	bool visit(MemberAccess const& _node) override;
 	void endVisit(IndexAccess const& _node) override;
+	void endVisit(IndexRangeAccess const& _node) override;
 	bool visit(InlineAssembly const& _node) override;
+	void endVisit(Break const&) override {}
+	void endVisit(Continue const&) override {}
 
 	/// Do not visit subtree if node is a RationalNumber.
 	/// Symbolic _expr is the rational literal.
@@ -102,6 +109,7 @@ protected:
 	void compareOperation(BinaryOperation const& _op);
 	void booleanOperation(BinaryOperation const& _op);
 
+	void initContract(ContractDefinition const& _contract);
 	void initFunction(FunctionDefinition const& _function);
 	void visitAssert(FunctionCall const& _funCall);
 	void visitRequire(FunctionCall const& _funCall);
@@ -112,6 +120,12 @@ protected:
 	/// Encodes a modifier or function body according to the modifier
 	/// visit depth.
 	void visitFunctionOrModifier();
+
+	/// Inlines a modifier or base constructor call.
+	void inlineModifierInvocation(ModifierInvocation const* _invocation, CallableDeclaration const* _definition);
+
+	/// Inlines the constructor hierarchy into a single constructor.
+	void inlineConstructorHierarchy(ContractDefinition const& _contract);
 
 	/// Defines a new global variable or function.
 	void defineGlobalVariable(std::string const& _name, Expression const& _expr, bool _increaseIndex = false);
@@ -152,6 +166,9 @@ protected:
 
 	using CallStackEntry = std::pair<CallableDeclaration const*, ASTNode const*>;
 
+	void createStateVariables(ContractDefinition const& _contract);
+	void initializeStateVariables(ContractDefinition const& _contract);
+	void createLocalVariables(FunctionDefinition const& _function);
 	void initializeLocalVariables(FunctionDefinition const& _function);
 	void initializeFunctionCallParameters(CallableDeclaration const& _function, std::vector<smt::Expression> const& _callArgs);
 	void resetStateVariables();
@@ -171,8 +188,10 @@ protected:
 	/// @returns an expression denoting the value of the variable declared in @a _decl
 	/// at the given index. Does not ensure that this index exists.
 	smt::Expression valueAtIndex(VariableDeclaration const& _decl, int _index);
-	/// Returns the expression corresponding to the AST node. Throws if the expression does not exist.
-	smt::Expression expr(Expression const& _e);
+	/// Returns the expression corresponding to the AST node.
+	/// If _targetType is not null apply conversion.
+	/// Throws if the expression does not exist.
+	smt::Expression expr(Expression const& _e, TypePointer _targetType = nullptr);
 	/// Creates the expression (value can be arbitrary)
 	void createExpr(Expression const& _e);
 	/// Creates the expression and sets its value.
@@ -197,12 +216,19 @@ protected:
 	VariableIndices copyVariableIndices();
 	/// Resets the variable indices.
 	void resetVariableIndices(VariableIndices const& _indices);
+	/// Used when starting a new block.
+	void clearIndices(ContractDefinition const* _contract, FunctionDefinition const* _function = nullptr);
+
 
 	/// @returns variables that are touched in _node's subtree.
 	std::set<VariableDeclaration const*> touchedVariables(ASTNode const& _node);
 
 	/// @returns the VariableDeclaration referenced by an Identifier or nullptr.
 	VariableDeclaration const* identifierToVariable(Expression const& _expr);
+
+	/// Creates symbolic expressions for the returned values
+	/// and set them as the components of the symbolic tuple.
+	void createReturnedExpressions(FunctionCall const& _funCall);
 
 	/// @returns a note to be added to warnings.
 	std::string extraComment();
@@ -222,7 +248,6 @@ protected:
 	/// warning before the others in case it's needed.
 	langutil::ErrorReporter m_errorReporter;
 	langutil::ErrorList m_smtErrors;
-	std::shared_ptr<langutil::Scanner> m_scanner;
 
 	/// Stores the current function/modifier call/invocation path.
 	std::vector<CallStackEntry> m_callStack;
@@ -238,9 +263,12 @@ protected:
 	/// Needs to be a stack because of function calls.
 	std::vector<int> m_modifierDepthStack;
 
+	std::map<ContractDefinition const*, ModifierInvocation const*> m_baseConstructorCalls;
+
+	ContractDefinition const* m_currentContract = nullptr;
+
 	/// Stores the context of the encoding.
 	smt::EncodingContext& m_context;
 };
 
-}
 }

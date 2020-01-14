@@ -18,6 +18,8 @@ set(sources
 	analysis/GlobalContext.h
 	analysis/NameAndTypeResolver.cpp
 	analysis/NameAndTypeResolver.h
+	analysis/OverrideChecker.cpp
+	analysis/OverrideChecker.h
 	analysis/PostTypeChecker.cpp
 	analysis/PostTypeChecker.h
 	analysis/ReferencesResolver.cpp
@@ -37,10 +39,14 @@ set(sources
 	ast/ASTAnnotations.h
 	ast/ASTEnums.h
 	ast/ASTForward.h
+	ast/AsmJsonImporter.cpp
+	ast/AsmJsonImporter.h
 	ast/ASTJsonConverter.cpp
 	ast/ASTJsonConverter.h
-	ast/ASTPrinter.cpp
-	ast/ASTPrinter.h
+	ast/ASTUtils.cpp
+	ast/ASTUtils.h
+	ast/ASTJsonImporter.cpp
+	ast/ASTJsonImporter.h
 	ast/ASTVisitor.h
 	ast/ExperimentalFeatures.h
 	ast/Types.cpp
@@ -77,6 +83,11 @@ set(sources
 	codegen/ir/IRLValue.h
 	formal/BMC.cpp
 	formal/BMC.h
+	formal/CHC.cpp
+	formal/CHC.h
+	formal/CHCSmtLib2Interface.cpp
+	formal/CHCSmtLib2Interface.h
+	formal/CHCSolverInterface.h
 	formal/EncodingContext.cpp
 	formal/EncodingContext.h
 	formal/ModelChecker.cpp
@@ -100,6 +111,7 @@ set(sources
 	interface/ABI.h
 	interface/CompilerStack.cpp
 	interface/CompilerStack.h
+	interface/DebugSettings.h
 	interface/GasEstimator.cpp
 	interface/GasEstimator.h
 	interface/Natspec.cpp
@@ -108,6 +120,8 @@ set(sources
 	interface/ReadFile.h
 	interface/StandardCompiler.cpp
 	interface/StandardCompiler.h
+	interface/StorageLayout.cpp
+	interface/StorageLayout.h
 	interface/Version.cpp
 	interface/Version.h
 	parsing/DocStringParser.cpp
@@ -121,7 +135,7 @@ find_package(Z3 4.6.0)
 if (${Z3_FOUND})
   add_definitions(-DHAVE_Z3)
   message("Z3 SMT solver found. This enables optional SMT checking with Z3.")
-  set(z3_SRCS formal/Z3Interface.cpp formal/Z3Interface.h)
+  set(z3_SRCS formal/Z3Interface.cpp formal/Z3Interface.h formal/Z3CHCInterface.cpp formal/Z3CHCInterface.h)
 else()
   set(z3_SRCS)
 endif()

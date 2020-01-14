@@ -13,12 +13,12 @@ Events are inheritable members of contracts. When you call them, they cause the
 arguments to be stored in the transaction's log - a special data structure
 in the blockchain. These logs are associated with the address of the contract,
 are incorporated into the blockchain, and stay there as long as a block is
-accessible (forever as of the Frontier and Homestead releases, but this might
+accessible (forever as of now, but this might
 change with Serenity). The Log and its event data is not accessible from within
 contracts (not even from the contract that created them).
 
-It is possible to request a simple payment verification (SPV) for logs, so if
-an external entity supplies a contract with such a verification, it can check
+It is possible to request a Merkle proof for logs, so if
+an external entity supplies a contract with such a proof, it can check
 that the log actually exists inside the blockchain. You have to supply block headers
 because the contract can only see the last 256 block hashes.
 
@@ -132,7 +132,7 @@ Low-Level Interface to Logs
 
 It is also possible to access the low-level interface to the logging
 mechanism via the functions ``log0``, ``log1``, ``log2``, ``log3`` and ``log4``.
-``logi`` takes ``i + 1`` parameter of type ``bytes32``, where the first
+Each function ``logi`` takes ``i + 1`` parameter of type ``bytes32``, where the first
 argument will be used for the data part of the log and the others
 as topics. The event call above can be performed in the same way as
 

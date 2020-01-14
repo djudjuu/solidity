@@ -20,37 +20,35 @@
 #include <test/libsolidity/AnalysisFramework.h>
 #include <test/TestCase.h>
 #include <liblangutil/Exceptions.h>
-#include <libdevcore/AnsiColorized.h>
+#include <libsolutil/AnsiColorized.h>
 
 #include <iosfwd>
 #include <string>
 #include <vector>
 #include <utility>
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 struct SyntaxTestError
 {
 	std::string type;
 	std::string message;
+	std::string sourceName;
 	int locationStart;
 	int locationEnd;
 	bool operator==(SyntaxTestError const& _rhs) const
 	{
 		return type == _rhs.type &&
 			message == _rhs.message &&
+			sourceName == _rhs.sourceName &&
 			locationStart == _rhs.locationStart &&
 			locationEnd == _rhs.locationEnd;
 	}
 };
 
 
-class SyntaxTest: AnalysisFramework, public EVMVersionRestrictedTestCase
+class SyntaxTest: public AnalysisFramework, public EVMVersionRestrictedTestCase
 {
 public:
 	static std::unique_ptr<TestCase> create(Config const& _config)
@@ -72,8 +70,12 @@ public:
 			printErrorList(_stream, m_errorList, _linePrefix, false);
 	}
 
-	static std::string errorMessage(Exception const& _e);
+	static std::string errorMessage(util::Exception const& _e);
 protected:
+	void setupCompiler();
+	void parseAndAnalyze();
+	void filterObtainedErrors();
+
 	static void printErrorList(
 		std::ostream& _stream,
 		std::vector<SyntaxTestError> const& _errors,
@@ -85,14 +87,12 @@ protected:
 
 	static std::vector<SyntaxTestError> parseExpectations(std::istream& _stream);
 
-	std::string m_source;
+	std::map<std::string, std::string> m_sources;
 	std::vector<SyntaxTestError> m_expectations;
 	std::vector<SyntaxTestError> m_errorList;
-	bool m_optimiseYul = false;
+	bool m_optimiseYul = true;
 	langutil::EVMVersion const m_evmVersion;
 	bool m_parserErrorRecovery = false;
 };
 
-}
-}
 }

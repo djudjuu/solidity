@@ -31,19 +31,18 @@
 #include <liblangutil/Scanner.h>
 #include <liblangutil/ErrorReporter.h>
 
-#include <boost/optional.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
-#include <string>
 #include <memory>
+#include <optional>
+#include <string>
 
 using namespace std;
-using namespace dev;
-using namespace langutil;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::langutil;
 
-namespace yul
-{
-namespace test
+namespace solidity::yul::test
 {
 
 namespace
@@ -61,7 +60,6 @@ bool parse(string const& _source, Dialect const& _dialect, ErrorReporter& errorR
 			return (yul::AsmAnalyzer(
 				analysisInfo,
 				errorReporter,
-				boost::none,
 				_dialect
 			)).analyze(*parserResult);
 		}
@@ -73,7 +71,7 @@ bool parse(string const& _source, Dialect const& _dialect, ErrorReporter& errorR
 	return false;
 }
 
-boost::optional<Error> parseAndReturnFirstError(string const& _source, Dialect const& _dialect, bool _allowWarnings = true)
+std::optional<Error> parseAndReturnFirstError(string const& _source, Dialect const& _dialect, bool _allowWarnings = true)
 {
 	ErrorList errors;
 	ErrorReporter errorReporter(errors);
@@ -118,7 +116,7 @@ do \
 { \
 	Error err = expectError((text), dialect, false); \
 	BOOST_CHECK(err.type() == (Error::Type::typ)); \
-	BOOST_CHECK(dev::solidity::searchErrorMessage(err, (substring))); \
+	BOOST_CHECK(solidity::frontend::test::searchErrorMessage(err, (substring))); \
 } while(0)
 
 #define CHECK_ERROR(text, typ, substring) CHECK_ERROR_DIALECT(text, typ, substring, Dialect::yul())
@@ -206,11 +204,6 @@ BOOST_AUTO_TEST_CASE(function_calls)
 BOOST_AUTO_TEST_CASE(tuple_assignment)
 {
 	BOOST_CHECK(successParse("{ function f() -> a:u256, b:u256, c:u256 {} let x:u256, y:u256, z:u256 := f() }"));
-}
-
-BOOST_AUTO_TEST_CASE(label)
-{
-	CHECK_ERROR("{ label: }", ParserError, "Labels are not supported.");
 }
 
 BOOST_AUTO_TEST_CASE(instructions)
@@ -549,11 +542,9 @@ BOOST_AUTO_TEST_CASE(builtins_parser)
 	SimpleDialect dialect;
 	CHECK_ERROR_DIALECT("{ let builtin := 6 }", ParserError, "Cannot use builtin function name \"builtin\" as identifier name.", dialect);
 	CHECK_ERROR_DIALECT("{ function builtin() {} }", ParserError, "Cannot use builtin function name \"builtin\" as identifier name.", dialect);
-	CHECK_ERROR_DIALECT("{ builtin := 6 }", ParserError, "Variable name must precede \":=\" in assignment.", dialect);
 	CHECK_ERROR_DIALECT("{ function f(x) { f(builtin) } }", ParserError, "Expected '(' but got ')'", dialect);
 	CHECK_ERROR_DIALECT("{ function f(builtin) {}", ParserError, "Cannot use builtin function name \"builtin\" as identifier name.", dialect);
 	CHECK_ERROR_DIALECT("{ function f() -> builtin {}", ParserError, "Cannot use builtin function name \"builtin\" as identifier name.", dialect);
-	CHECK_ERROR_DIALECT("{ function g() -> a,b  {} builtin, builtin2 := g() }", ParserError, "Variable name must precede \",\" in multiple assignment.", dialect);
 }
 
 BOOST_AUTO_TEST_CASE(builtins_analysis)
@@ -565,7 +556,7 @@ BOOST_AUTO_TEST_CASE(builtins_analysis)
 		{
 			return _name == "builtin"_yulstring ? &f : nullptr;
 		}
-		BuiltinFunction f{"builtin"_yulstring, vector<Type>(2), vector<Type>(3), false, false};
+		BuiltinFunction f{"builtin"_yulstring, vector<Type>(2), vector<Type>(3), {}};
 	};
 
 	SimpleDialect dialect;
@@ -574,7 +565,7 @@ BOOST_AUTO_TEST_CASE(builtins_analysis)
 	CHECK_ERROR_DIALECT("{ let a, b := builtin(1, 2) }", DeclarationError, "Variable count mismatch: 2 variables and 3 values.", dialect);
 }
 
+
 BOOST_AUTO_TEST_SUITE_END()
 
-}
 } // end namespaces

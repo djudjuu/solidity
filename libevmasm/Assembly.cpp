@@ -33,9 +33,10 @@
 #include <json/json.h>
 
 using namespace std;
-using namespace dev;
-using namespace dev::eth;
-using namespace langutil;
+using namespace solidity;
+using namespace solidity::evmasm;
+using namespace solidity::langutil;
+using namespace solidity::util;
 
 void Assembly::append(Assembly const& _a)
 {
@@ -86,6 +87,7 @@ AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 	m_items.emplace_back(_i);
 	if (m_items.back().location().isEmpty() && !m_currentSourceLocation.isEmpty())
 		m_items.back().setLocation(m_currentSourceLocation);
+	m_items.back().m_modifierDepth = m_currentModifierDepth;
 	return back();
 }
 
@@ -104,7 +106,7 @@ unsigned Assembly::bytesRequired(unsigned subTagSize) const
 
 		for (AssemblyItem const& i: m_items)
 			ret += i.bytesRequired(tagSize);
-		if (dev::bytesRequired(ret) <= tagSize)
+		if (util::bytesRequired(ret) <= tagSize)
 			return ret;
 	}
 }
@@ -258,7 +260,7 @@ Json::Value Assembly::createJsonValue(string _name, int _begin, int _end, string
 string Assembly::toStringInHex(u256 _value)
 {
 	std::stringstream hexStr;
-	hexStr << hex << _value;
+	hexStr << std::uppercase << hex << _value;
 	return hexStr.str();
 }
 
@@ -289,15 +291,15 @@ Json::Value Assembly::assemblyJSON(StringMap const& _sourceCodes) const
 					createJsonValue("PUSH [ErrorTag]", i.location().start, i.location().end, ""));
 			else
 				collection.append(
-					createJsonValue("PUSH [tag]", i.location().start, i.location().end, dev::toString(i.data())));
+					createJsonValue("PUSH [tag]", i.location().start, i.location().end, toString(i.data())));
 			break;
 		case PushSub:
 			collection.append(
-				createJsonValue("PUSH [$]", i.location().start, i.location().end, dev::toString(h256(i.data()))));
+				createJsonValue("PUSH [$]", i.location().start, i.location().end, toString(h256(i.data()))));
 			break;
 		case PushSubSize:
 			collection.append(
-				createJsonValue("PUSH #[$]", i.location().start, i.location().end, dev::toString(h256(i.data()))));
+				createJsonValue("PUSH #[$]", i.location().start, i.location().end, toString(h256(i.data()))));
 			break;
 		case PushProgramSize:
 			collection.append(
@@ -315,7 +317,7 @@ Json::Value Assembly::assemblyJSON(StringMap const& _sourceCodes) const
 			break;
 		case Tag:
 			collection.append(
-				createJsonValue("tag", i.location().start, i.location().end, dev::toString(i.data())));
+				createJsonValue("tag", i.location().start, i.location().end, toString(i.data())));
 			collection.append(
 				createJsonValue("JUMPDEST", i.location().start, i.location().end));
 			break;
@@ -323,7 +325,7 @@ Json::Value Assembly::assemblyJSON(StringMap const& _sourceCodes) const
 			collection.append(createJsonValue("PUSH data", i.location().start, i.location().end, toStringInHex(i.data())));
 			break;
 		default:
-			BOOST_THROW_EXCEPTION(InvalidOpcode());
+			assertThrow(false, InvalidOpcode, "");
 		}
 	}
 
@@ -358,7 +360,7 @@ AssemblyItem Assembly::namedTag(string const& _name)
 
 AssemblyItem Assembly::newPushLibraryAddress(string const& _identifier)
 {
-	h256 h(dev::keccak256(_identifier));
+	h256 h(util::keccak256(_identifier));
 	m_libraries[h] = _identifier;
 	return AssemblyItem{PushLibraryAddress, h};
 }
@@ -519,8 +521,11 @@ map<u256, u256> Assembly::optimiseInternal(
 
 LinkerObject const& Assembly::assemble() const
 {
+	// Return the already assembled object, if present.
 	if (!m_assembledObject.bytecode.empty())
 		return m_assembledObject;
+	// Otherwise ensure the object is actually clear.
+	assertThrow(m_assembledObject.linkReferences.empty(), AssemblyException, "Unexpected link references.");
 
 	size_t subTagSize = 1;
 	for (auto const& sub: m_subs)
@@ -539,14 +544,14 @@ LinkerObject const& Assembly::assemble() const
 	multimap<h256, unsigned> dataRef;
 	multimap<size_t, size_t> subRef;
 	vector<unsigned> sizeRef; ///< Pointers to code locations where the size of the program is inserted
-	unsigned bytesPerTag = dev::bytesRequired(bytesRequiredForCode);
+	unsigned bytesPerTag = util::bytesRequired(bytesRequiredForCode);
 	uint8_t tagPush = (uint8_t)Instruction::PUSH1 - 1 + bytesPerTag;
 
 	unsigned bytesRequiredIncludingData = bytesRequiredForCode + 1 + m_auxiliaryData.size();
 	for (auto const& sub: m_subs)
 		bytesRequiredIncludingData += sub->assemble().bytecode.size();
 
-	unsigned bytesPerDataRef = dev::bytesRequired(bytesRequiredIncludingData);
+	unsigned bytesPerDataRef = util::bytesRequired(bytesRequiredIncludingData);
 	uint8_t dataRefPush = (uint8_t)Instruction::PUSH1 - 1 + bytesPerDataRef;
 	ret.bytecode.reserve(bytesRequiredIncludingData);
 
@@ -576,7 +581,7 @@ LinkerObject const& Assembly::assemble() const
 		}
 		case Push:
 		{
-			uint8_t b = max<unsigned>(1, dev::bytesRequired(i.data()));
+			uint8_t b = max<unsigned>(1, util::bytesRequired(i.data()));
 			ret.bytecode.push_back((uint8_t)Instruction::PUSH1 - 1 + b);
 			ret.bytecode.resize(ret.bytecode.size() + b);
 			bytesRef byr(&ret.bytecode.back() + 1 - b, b);
@@ -596,15 +601,17 @@ LinkerObject const& Assembly::assemble() const
 			ret.bytecode.resize(ret.bytecode.size() + bytesPerDataRef);
 			break;
 		case PushSub:
+			assertThrow(i.data() <= size_t(-1), AssemblyException, "");
 			ret.bytecode.push_back(dataRefPush);
 			subRef.insert(make_pair(size_t(i.data()), ret.bytecode.size()));
 			ret.bytecode.resize(ret.bytecode.size() + bytesPerDataRef);
 			break;
 		case PushSubSize:
 		{
+			assertThrow(i.data() <= size_t(-1), AssemblyException, "");
 			auto s = m_subs.at(size_t(i.data()))->assemble().bytecode.size();
 			i.setPushedValue(u256(s));
-			uint8_t b = max<unsigned>(1, dev::bytesRequired(s));
+			uint8_t b = max<unsigned>(1, util::bytesRequired(s));
 			ret.bytecode.push_back((uint8_t)Instruction::PUSH1 - 1 + b);
 			ret.bytecode.resize(ret.bytecode.size() + b);
 			bytesRef byr(&ret.bytecode.back() + 1 - b, b);
@@ -636,7 +643,7 @@ LinkerObject const& Assembly::assemble() const
 			ret.bytecode.push_back((uint8_t)Instruction::JUMPDEST);
 			break;
 		default:
-			BOOST_THROW_EXCEPTION(InvalidOpcode());
+			assertThrow(false, InvalidOpcode, "Unexpected opcode while assembling.");
 		}
 	}
 
@@ -669,7 +676,7 @@ LinkerObject const& Assembly::assemble() const
 		assertThrow(tagId < tagPositions.size(), AssemblyException, "Reference to non-existing tag.");
 		size_t pos = tagPositions[tagId];
 		assertThrow(pos != size_t(-1), AssemblyException, "Reference to tag without position.");
-		assertThrow(dev::bytesRequired(pos) <= bytesPerTag, AssemblyException, "Tag too large for reserved space.");
+		assertThrow(util::bytesRequired(pos) <= bytesPerTag, AssemblyException, "Tag too large for reserved space.");
 		bytesRef r(ret.bytecode.data() + i.first, bytesPerTag);
 		toBigEndian(pos, r);
 	}

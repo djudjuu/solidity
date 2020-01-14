@@ -23,9 +23,10 @@
 #include <algorithm>
 
 using namespace std;
-using namespace dev;
-using namespace dev::solidity;
-using namespace dev::solidity::smt;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::frontend;
+using namespace solidity::frontend::smt;
 
 set<VariableDeclaration const*> VariableUsage::touchedVariables(ASTNode const& _node, vector<CallableDeclaration const*> const& _outerCallstack)
 {
@@ -58,9 +59,12 @@ void VariableUsage::endVisit(IndexAccess const& _indexAccess)
 void VariableUsage::endVisit(FunctionCall const& _funCall)
 {
 	if (m_inlineFunctionCalls)
-		if (auto const& funDef = BMC::inlinedFunctionCallToDefinition(_funCall))
+		if (auto const& funDef = SMTEncoder::functionCallToDefinition(_funCall))
+		{
+			solAssert(funDef, "");
 			if (find(m_callStack.begin(), m_callStack.end(), funDef) == m_callStack.end())
 				funDef->accept(*this);
+		}
 }
 
 bool VariableUsage::visit(FunctionDefinition const& _function)

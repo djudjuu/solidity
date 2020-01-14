@@ -25,8 +25,8 @@
 #include <libevmasm/AssemblyItem.h>
 
 using namespace std;
-using namespace dev;
-using namespace dev::eth;
+using namespace solidity;
+using namespace solidity::evmasm;
 
 bool SemanticInformation::breaksCSEAnalysisBlock(AssemblyItem const& _item, bool _msizeImportant)
 {
@@ -96,14 +96,14 @@ bool SemanticInformation::isDupInstruction(AssemblyItem const& _item)
 {
 	if (_item.type() != Operation)
 		return false;
-	return dev::eth::isDupInstruction(_item.instruction());
+	return evmasm::isDupInstruction(_item.instruction());
 }
 
 bool SemanticInformation::isSwapInstruction(AssemblyItem const& _item)
 {
 	if (_item.type() != Operation)
 		return false;
-	return dev::eth::isSwapInstruction(_item.instruction());
+	return evmasm::isSwapInstruction(_item.instruction());
 }
 
 bool SemanticInformation::isJumpInstruction(AssemblyItem const& _item)
@@ -172,6 +172,7 @@ bool SemanticInformation::isDeterministic(AssemblyItem const& _item)
 	case Instruction::PC:
 	case Instruction::MSIZE: // depends on previous writes and reads, not only on content
 	case Instruction::BALANCE: // depends on previous calls
+	case Instruction::SELFBALANCE: // depends on previous calls
 	case Instruction::EXTCODESIZE:
 	case Instruction::EXTCODEHASH:
 	case Instruction::RETURNDATACOPY: // depends on previous calls
@@ -194,6 +195,7 @@ bool SemanticInformation::movable(Instruction _instruction)
 	{
 	case Instruction::KECCAK256:
 	case Instruction::BALANCE:
+	case Instruction::SELFBALANCE:
 	case Instruction::EXTCODESIZE:
 	case Instruction::EXTCODEHASH:
 	case Instruction::RETURNDATASIZE:
@@ -265,6 +267,7 @@ bool SemanticInformation::invalidInPureFunctions(Instruction _instruction)
 	switch (_instruction)
 	{
 	case Instruction::ADDRESS:
+	case Instruction::SELFBALANCE:
 	case Instruction::BALANCE:
 	case Instruction::ORIGIN:
 	case Instruction::CALLER:

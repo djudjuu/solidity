@@ -28,7 +28,7 @@
 #include <array>
 #include <vector>
 
-namespace yul
+namespace solidity::yul
 {
 
 /**
@@ -37,11 +37,11 @@ namespace yul
  * but wasm only supports values up to 64 bits, so we use four u64 values to simulate
  * one u256 value.
  *
- * For FunctionalInstruction that accepts or returns u256 values, they accepts or returns
+ * For FunctionCall that accepts or returns u256 values, they accepts or returns
  * four times the number of values after this transformation, with the order of significance,
  * from the most significant to the least significant.
  *
- * For example, the FunctionalInstruction MUL supplied by code generator
+ * For example, the FunctionCall MUL supplied by code generator
  * should take 8 arguments and return 4 values (instead of 2 and 1) after this transformation.
  *
  * mul(a1, a2, a3, a4, b1, b2, b3, b4) -> c1, c2, c3, c4
@@ -55,13 +55,12 @@ namespace yul
  * takes four u64 parameters and is supposed to return the logical disjunction
  * of them as a u64 value. If this name is already used somewhere, it is renamed.
  *
- * Prerequisite: Disambiguator, ExpressionSplitter
+ * Prerequisite: Disambiguator, ForLoopConditionIntoBody, ExpressionSplitter
  */
 class WordSizeTransform: public ASTModifier
 {
 public:
 	void operator()(FunctionDefinition&) override;
-	void operator()(FunctionalInstruction&) override;
 	void operator()(FunctionCall&) override;
 	void operator()(If&) override;
 	void operator()(Switch&) override;

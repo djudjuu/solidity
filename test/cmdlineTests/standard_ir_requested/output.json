@@ -10,16 +10,16 @@ object \"C_6\" {
     code {
         mstore(64, 128)
 
+        // Begin state variable initialization for contract \"C\" (0 variables)
+        // End state variable initialization for contract \"C\".
+
 
         codecopy(0, dataoffset(\"C_6_deployed\"), datasize(\"C_6_deployed\"))
         return(0, datasize(\"C_6_deployed\"))
 
 
         function fun_f_5()  {
-            for { let return_flag := 1 } return_flag {} {
 
-                break
-            }
         }
 
     }
@@ -45,6 +45,7 @@ object \"C_6\" {
 
                 default {}
             }
+            if iszero(calldatasize()) {  }
             revert(0, 0)
 
 
@@ -67,10 +68,7 @@ object \"C_6\" {
             }
 
             function fun_f_5()  {
-                for { let return_flag := 1 } return_flag {} {
 
-                    break
-                }
             }
 
             function shift_right_224_unsigned(value) -> newValue {

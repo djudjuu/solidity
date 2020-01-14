@@ -37,6 +37,8 @@
 
 #include <test/InteractiveTests.h>
 #include <test/Options.h>
+#include <test/EVMHost.h>
+#include <test/Common.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -44,21 +46,9 @@
 #include <string>
 
 using namespace boost::unit_test;
-using namespace dev::solidity::test;
+using namespace solidity::frontend::test;
 namespace fs = boost::filesystem;
 using namespace std;
-
-#if BOOST_VERSION < 105900
-test_case *make_test_case(
-	function<void()> const& _fn,
-	string const& _name,
-	string const& /* _filename */,
-	size_t /* _line */
-)
-{
-	return make_test_case(_fn, _name);
-}
-#endif
 
 namespace
 {
@@ -74,13 +64,12 @@ int registerTests(
 	boost::unit_test::test_suite& _suite,
 	boost::filesystem::path const& _basepath,
 	boost::filesystem::path const& _path,
-	std::string const& _ipcPath,
 	TestCase::TestCaseCreator _testCaseCreator
 )
 {
 	int numTestsAdded = 0;
 	fs::path fullpath = _basepath / _path;
-	TestCase::Config config{fullpath.string(), _ipcPath, dev::test::Options::get().evmVersion()};
+	TestCase::Config config{fullpath.string(), solidity::test::Options::get().evmVersion()};
 	if (fs::is_directory(fullpath))
 	{
 		test_suite* sub_suite = BOOST_TEST_SUITE(_path.filename().string());
@@ -89,14 +78,14 @@ int registerTests(
 			fs::directory_iterator()
 		))
 			if (fs::is_directory(entry.path()) || TestCase::isTestFilename(entry.path().filename()))
-				numTestsAdded += registerTests(*sub_suite, _basepath, _path / entry.path().filename(), _ipcPath, _testCaseCreator);
+				numTestsAdded += registerTests(*sub_suite, _basepath, _path / entry.path().filename(), _testCaseCreator);
 		_suite.add(sub_suite);
 	}
 	else
 	{
 		static vector<unique_ptr<string>> filenames;
 
-		filenames.emplace_back(new string(_path.string()));
+		filenames.emplace_back(make_unique<string>(_path.string()));
 		_suite.add(make_test_case(
 			[config, _testCaseCreator]
 			{
@@ -105,7 +94,7 @@ int registerTests(
 					{
 						stringstream errorStream;
 						auto testCase = _testCaseCreator(config);
-						if (testCase->validateSettings(dev::test::Options::get().evmVersion()))
+						if (testCase->validateSettings(solidity::test::Options::get().evmVersion()))
 							switch (testCase->run(errorStream))
 							{
 								case TestCase::TestResult::Success:
@@ -138,29 +127,36 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/[] )
 {
 	master_test_suite_t& master = framework::master_test_suite();
 	master.p_name.value = "SolidityTests";
-	dev::test::Options::get().validate();
+	solidity::test::Options::get().validate();
 
+	bool disableSemantics = !solidity::test::EVMHost::getVM(solidity::test::Options::get().evmonePath.string());
+	if (disableSemantics)
+	{
+		cout << "Unable to find " << solidity::test::evmoneFilename << ". Please provide the path using -- --evmonepath <path>." << endl;
+		cout << "You can download it at" << endl;
+		cout << solidity::test::evmoneDownloadLink << endl;
+		cout << endl << "--- SKIPPING ALL SEMANTICS TESTS ---" << endl << endl;
+	}
 	// Include the interactive tests in the automatic tests as well
 	for (auto const& ts: g_interactiveTestsuites)
 	{
-		auto const& options = dev::test::Options::get();
+		auto const& options = solidity::test::Options::get();
 
 		if (ts.smt && options.disableSMT)
 			continue;
 
-		if (ts.ipc && options.disableIPC)
+		if (ts.needsVM && disableSemantics)
 			continue;
 
 		solAssert(registerTests(
 			master,
 			options.testPath / ts.path,
 			ts.subpath,
-			options.ipcPath.string(),
 			ts.testCaseCreator
 		) > 0, std::string("no ") + ts.title + " tests found");
 	}
 
-	if (dev::test::Options::get().disableIPC)
+	if (disableSemantics)
 	{
 		for (auto suite: {
 			"ABIDecoderTest",
@@ -181,7 +177,7 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/[] )
 			removeTestSuite(suite);
 	}
 
-	if (dev::test::Options::get().disableSMT)
+	if (solidity::test::Options::get().disableSMT)
 		removeTestSuite("SMTChecker");
 
 	return 0;

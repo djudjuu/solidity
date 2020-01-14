@@ -24,17 +24,12 @@
 
 #include <libyul/AsmData.h>
 
-#include <libdevcore/Common.h>
+#include <libsolutil/Common.h>
 
 using namespace std;
-using namespace dev;
-using namespace yul;
-
-Statement ASTCopier::operator()(Instruction const&)
-{
-	assertThrow(false, OptimizerException, "Invalid operation.");
-	return {};
-}
+using namespace solidity;
+using namespace solidity::yul;
+using namespace solidity::util;
 
 Statement ASTCopier::operator()(ExpressionStatement const& _statement)
 {
@@ -59,33 +54,12 @@ Statement ASTCopier::operator()(Assignment const& _assignment)
 	};
 }
 
-Statement ASTCopier::operator()(StackAssignment const&)
-{
-	assertThrow(false, OptimizerException, "Invalid operation.");
-	return {};
-}
-
-Statement ASTCopier::operator()(Label const&)
-{
-	assertThrow(false, OptimizerException, "Invalid operation.");
-	return {};
-}
-
 Expression ASTCopier::operator()(FunctionCall const& _call)
 {
 	return FunctionCall{
 		_call.location,
 		translate(_call.functionName),
 		translateVector(_call.arguments)
-	};
-}
-
-Expression ASTCopier::operator()(FunctionalInstruction const& _instruction)
-{
-	return FunctionalInstruction{
-		_instruction.location,
-		_instruction.instruction,
-		translateVector(_instruction.arguments)
 	};
 }
 
@@ -148,6 +122,11 @@ Statement ASTCopier::operator()(Continue const& _continue)
 	return Continue{ _continue };
 }
 
+Statement ASTCopier::operator()(Leave const& _leaveStatement)
+{
+	return Leave{_leaveStatement};
+}
+
 Statement ASTCopier::operator ()(Block const& _block)
 {
 	return translate(_block);
@@ -155,12 +134,12 @@ Statement ASTCopier::operator ()(Block const& _block)
 
 Expression ASTCopier::translate(Expression const& _expression)
 {
-	return _expression.apply_visitor(static_cast<ExpressionCopier&>(*this));
+	return std::visit(static_cast<ExpressionCopier&>(*this), _expression);
 }
 
 Statement ASTCopier::translate(Statement const& _statement)
 {
-	return _statement.apply_visitor(static_cast<StatementCopier&>(*this));
+	return std::visit(static_cast<StatementCopier&>(*this), _statement);
 }
 
 Block ASTCopier::translate(Block const& _block)

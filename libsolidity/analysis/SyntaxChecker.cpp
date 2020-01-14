@@ -34,9 +34,9 @@
 #include <string>
 
 using namespace std;
-using namespace dev;
-using namespace langutil;
-using namespace dev::solidity;
+using namespace solidity;
+using namespace solidity::langutil;
+using namespace solidity::frontend;
 
 
 bool SyntaxChecker::checkSyntax(ASTNode const& _astRoot)
@@ -106,7 +106,7 @@ bool SyntaxChecker::visit(PragmaDirective const& _pragma)
 			{
 				auto feature = ExperimentalFeatureNames.at(literal);
 				m_sourceUnit->annotation().experimentalFeatures.insert(feature);
-				if (!ExperimentalFeatureOnlyAnalysis.count(feature))
+				if (!ExperimentalFeatureWithoutWarning.count(feature))
 					m_errorReporter.warning(_pragma.location(), "Experimental features are turned on. Do not use experimental features on live deployments.");
 			}
 		}
@@ -262,10 +262,7 @@ bool SyntaxChecker::visit(InlineAssembly const& _inlineAssembly)
 	if (!m_useYulOptimizer)
 		return false;
 
-	if (yul::SideEffectsCollector(
-		_inlineAssembly.dialect(),
-		_inlineAssembly.operations()
-	).containsMSize())
+	if (yul::MSizeFinder::containsMSize(_inlineAssembly.dialect(), _inlineAssembly.operations()))
 		m_errorReporter.syntaxError(
 			_inlineAssembly.location(),
 			"The msize instruction cannot be used when the Yul optimizer is activated because "
@@ -298,7 +295,7 @@ bool SyntaxChecker::visit(FunctionDefinition const& _function)
 {
 	if (_function.noVisibilitySpecified())
 	{
-		string suggestedVisibility = _function.isFallback() || m_isInterface ? "external" : "public";
+		string suggestedVisibility = _function.isFallback() || _function.isReceive() || m_isInterface ? "external" : "public";
 		m_errorReporter.syntaxError(
 			_function.location(),
 			"No visibility specified. Did you intend to add \"" + suggestedVisibility + "\"?"

@@ -26,23 +26,20 @@
 #include <libsolidity/ast/ASTEnums.h>
 #include <libsolidity/ast/ExperimentalFeatures.h>
 
-#include <boost/optional.hpp>
-
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <vector>
 
-namespace yul
+namespace solidity::yul
 {
 struct AsmAnalysisInfo;
 struct Identifier;
 struct Dialect;
 }
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class Type;
@@ -76,7 +73,18 @@ struct SourceUnitAnnotation: ASTAnnotation
 	std::set<ExperimentalFeature> experimentalFeatures;
 };
 
-struct ImportAnnotation: ASTAnnotation
+struct ScopableAnnotation
+{
+	/// The scope this declaration resides in. Can be nullptr if it is the global scope.
+	/// Available only after name and type resolution step.
+	ASTNode const* scope = nullptr;
+};
+
+struct DeclarationAnnotation: ASTAnnotation, ScopableAnnotation
+{
+};
+
+struct ImportAnnotation: DeclarationAnnotation
 {
 	/// The absolute path of the source unit to import.
 	std::string absolutePath;
@@ -84,7 +92,7 @@ struct ImportAnnotation: ASTAnnotation
 	SourceUnit const* sourceUnit = nullptr;
 };
 
-struct TypeDeclarationAnnotation: ASTAnnotation
+struct TypeDeclarationAnnotation: DeclarationAnnotation
 {
 	/// The name of this type, prefixed by proper namespaces if globally accessible.
 	std::string canonicalName;
@@ -105,25 +113,32 @@ struct ContractDefinitionAnnotation: TypeDeclarationAnnotation, DocumentedAnnota
 	std::map<FunctionDefinition const*, ASTNode const*> baseConstructorArguments;
 };
 
-struct FunctionDefinitionAnnotation: ASTAnnotation, DocumentedAnnotation
+struct CallableDeclarationAnnotation: DeclarationAnnotation
 {
-	/// The function this function overrides, if any. This is always the closest
-	/// in the linearized inheritance hierarchy.
-	FunctionDefinition const* superFunction = nullptr;
+	/// The set of functions/modifiers/events this callable overrides.
+	std::set<CallableDeclaration const*> baseFunctions;
 };
 
-struct EventDefinitionAnnotation: ASTAnnotation, DocumentedAnnotation
+struct FunctionDefinitionAnnotation: CallableDeclarationAnnotation, DocumentedAnnotation
+{
+	/// Pointer to the contract this function is defined in
+	ContractDefinition const* contract = nullptr;
+};
+
+struct EventDefinitionAnnotation: CallableDeclarationAnnotation, DocumentedAnnotation
 {
 };
 
-struct ModifierDefinitionAnnotation: ASTAnnotation, DocumentedAnnotation
+struct ModifierDefinitionAnnotation: CallableDeclarationAnnotation, DocumentedAnnotation
 {
 };
 
-struct VariableDeclarationAnnotation: ASTAnnotation
+struct VariableDeclarationAnnotation: DeclarationAnnotation
 {
 	/// Type of variable (type of identifier referencing this variable).
 	TypePointer type = nullptr;
+	/// The set of functions this (public state) variable overrides.
+	std::set<CallableDeclaration const*> baseFunctions;
 };
 
 struct StatementAnnotation: ASTAnnotation, DocumentedAnnotation
@@ -144,6 +159,18 @@ struct InlineAssemblyAnnotation: StatementAnnotation
 	std::map<yul::Identifier const*, ExternalIdentifierInfo> externalReferences;
 	/// Information generated during analysis phase.
 	std::shared_ptr<yul::AsmAnalysisInfo> analysisInfo;
+};
+
+struct BlockAnnotation: StatementAnnotation, ScopableAnnotation
+{
+};
+
+struct TryCatchClauseAnnotation: ASTAnnotation, ScopableAnnotation
+{
+};
+
+struct ForStatementAnnotation: StatementAnnotation, ScopableAnnotation
+{
 };
 
 struct ReturnAnnotation: StatementAnnotation
@@ -183,7 +210,7 @@ struct ExpressionAnnotation: ASTAnnotation
 
 	/// Types and - if given - names of arguments if the expr. is a function
 	/// that is called, used for overload resoultion
-	boost::optional<FuncCallArguments> arguments;
+	std::optional<FuncCallArguments> arguments;
 };
 
 struct IdentifierAnnotation: ExpressionAnnotation
@@ -218,7 +245,8 @@ enum class FunctionCallKind
 struct FunctionCallAnnotation: ExpressionAnnotation
 {
 	FunctionCallKind kind = FunctionCallKind::Unset;
+	/// If true, this is the external call of a try statement.
+	bool tryCall = false;
 };
 
-}
 }

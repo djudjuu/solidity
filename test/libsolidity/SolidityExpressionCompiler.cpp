@@ -34,14 +34,10 @@
 #include <test/Options.h>
 
 using namespace std;
-using namespace dev::eth;
-using namespace langutil;
+using namespace solidity::evmasm;
+using namespace solidity::langutil;
 
-namespace dev
-{
-namespace solidity
-{
-namespace test
+namespace solidity::frontend::test
 {
 
 namespace
@@ -102,7 +98,7 @@ bytes compileFirstExpression(
 	{
 		ErrorList errors;
 		ErrorReporter errorReporter(errors);
-		sourceUnit = Parser(errorReporter, dev::test::Options::get().evmVersion()).parse(
+		sourceUnit = Parser(errorReporter, solidity::test::Options::get().evmVersion()).parse(
 			make_shared<Scanner>(CharStream(_sourceCode, ""))
 		);
 		if (!sourceUnit)
@@ -118,7 +114,7 @@ bytes compileFirstExpression(
 	ErrorReporter errorReporter(errors);
 	GlobalContext globalContext;
 	map<ASTNode const*, shared_ptr<DeclarationContainer>> scopes;
-	NameAndTypeResolver resolver(globalContext, scopes, errorReporter);
+	NameAndTypeResolver resolver(globalContext, solidity::test::Options::get().evmVersion(), scopes, errorReporter);
 	resolver.registerDeclarations(*sourceUnit);
 
 	vector<ContractDefinition const*> inheritanceHierarchy;
@@ -132,7 +128,7 @@ bytes compileFirstExpression(
 		if (ContractDefinition* contract = dynamic_cast<ContractDefinition*>(node.get()))
 		{
 			ErrorReporter errorReporter(errors);
-			TypeChecker typeChecker(dev::test::Options::get().evmVersion(), errorReporter);
+			TypeChecker typeChecker(solidity::test::Options::get().evmVersion(), errorReporter);
 			BOOST_REQUIRE(typeChecker.checkTypeRequirements(*contract));
 		}
 	for (ASTPointer<ASTNode> const& node: sourceUnit->nodes())
@@ -141,7 +137,7 @@ bytes compileFirstExpression(
 			FirstExpressionExtractor extractor(*contract);
 			BOOST_REQUIRE(extractor.expression() != nullptr);
 
-			CompilerContext context(dev::test::Options::get().evmVersion());
+			CompilerContext context(solidity::test::Options::get().evmVersion());
 			context.resetVisitedNodes(contract);
 			context.setInheritanceHierarchy(inheritanceHierarchy);
 			unsigned parametersSize = _localVariables.size(); // assume they are all one slot on the stack
@@ -152,7 +148,11 @@ bytes compileFirstExpression(
 					parametersSize--
 				);
 
-			ExpressionCompiler(context, dev::test::Options::get().optimize).compile(*extractor.expression());
+			ExpressionCompiler(
+				context,
+				RevertStrings::Default,
+				solidity::test::Options::get().optimize
+			).compile(*extractor.expression());
 
 			for (vector<string> const& function: _functions)
 				context << context.functionEntryLabel(dynamic_cast<FunctionDefinition const&>(
@@ -160,7 +160,7 @@ bytes compileFirstExpression(
 				));
 			bytes instructions = context.assembledObject().bytecode;
 			// debug
-			// cout << eth::disassemble(instructions) << endl;
+			// cout << evmasm::disassemble(instructions) << endl;
 			return instructions;
 		}
 	BOOST_FAIL("No contract found in source.");
@@ -282,7 +282,7 @@ BOOST_AUTO_TEST_CASE(comparison)
 	bytes code = compileFirstExpression(sourceCode);
 
 	bytes expectation;
-	if (dev::test::Options::get().optimize)
+	if (solidity::test::Options::get().optimize)
 		expectation = {
 			uint8_t(Instruction::PUSH2), 0x11, 0xaa,
 			uint8_t(Instruction::PUSH2), 0x10, 0xaa,
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE(arithmetic)
 	bytes code = compileFirstExpression(sourceCode, {}, {{"test", "f", "y"}});
 
 	bytes expectation;
-	if (dev::test::Options::get().optimize)
+	if (solidity::test::Options::get().optimize)
 		expectation = {
 			uint8_t(Instruction::PUSH1), 0x2,
 			uint8_t(Instruction::PUSH1), 0x3,
@@ -426,7 +426,7 @@ BOOST_AUTO_TEST_CASE(unary_operators)
 	bytes code = compileFirstExpression(sourceCode, {}, {{"test", "f", "y"}});
 
 	bytes expectation;
-	if (dev::test::Options::get().optimize)
+	if (solidity::test::Options::get().optimize)
 		expectation = {
 			uint8_t(Instruction::DUP1),
 			uint8_t(Instruction::PUSH1), 0x0,
@@ -517,7 +517,7 @@ BOOST_AUTO_TEST_CASE(assignment)
 
 	// Stack: a, b
 	bytes expectation;
-	if (dev::test::Options::get().optimize)
+	if (solidity::test::Options::get().optimize)
 		expectation = {
 			uint8_t(Instruction::DUP1),
 			uint8_t(Instruction::DUP3),
@@ -617,8 +617,25 @@ BOOST_AUTO_TEST_CASE(gas_left)
 	BOOST_CHECK_EQUAL_COLLECTIONS(code.begin(), code.end(), expectation.begin(), expectation.end());
 }
 
+BOOST_AUTO_TEST_CASE(selfbalance)
+{
+	char const* sourceCode = R"(
+		contract test {
+			function f() returns (uint) {
+				return address(this).balance;
+			}
+		}
+	)";
+
+	bytes code = compileFirstExpression(sourceCode, {}, {});
+
+	if (solidity::test::Options::get().evmVersion() == EVMVersion::istanbul())
+	{
+		bytes expectation({uint8_t(Instruction::SELFBALANCE)});
+		BOOST_CHECK_EQUAL_COLLECTIONS(code.begin(), code.end(), expectation.begin(), expectation.end());
+	}
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

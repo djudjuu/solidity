@@ -23,42 +23,53 @@
 #pragma once
 
 #include <libsolidity/formal/BMC.h>
+#include <libsolidity/formal/CHC.h>
 #include <libsolidity/formal/EncodingContext.h>
+#include <libsolidity/formal/SolverInterface.h>
 
 #include <libsolidity/interface/ReadFile.h>
 #include <liblangutil/ErrorReporter.h>
-#include <liblangutil/Scanner.h>
 
-namespace langutil
+namespace solidity::langutil
 {
 class ErrorReporter;
 struct SourceLocation;
 }
 
-namespace dev
-{
-namespace solidity
+namespace solidity::frontend
 {
 
 class ModelChecker
 {
 public:
-	ModelChecker(langutil::ErrorReporter& _errorReporter, std::map<h256, std::string> const& _smtlib2Responses);
+	/// @param _enabledSolvers represents a runtime choice of which SMT solvers
+	/// should be used, even if all are available. The default choice is to use all.
+	ModelChecker(
+		langutil::ErrorReporter& _errorReporter,
+		std::map<h256, std::string> const& _smtlib2Responses,
+		ReadCallback::Callback const& _smtCallback = ReadCallback::Callback(),
+		smt::SMTSolverChoice _enabledSolvers = smt::SMTSolverChoice::All()
+	);
 
-	void analyze(SourceUnit const& _sources, std::shared_ptr<langutil::Scanner> const& _scanner);
+	void analyze(SourceUnit const& _sources);
 
 	/// This is used if the SMT solver is not directly linked into this binary.
 	/// @returns a list of inputs to the SMT solver that were not part of the argument to
 	/// the constructor.
 	std::vector<std::string> unhandledQueries();
 
+	/// @returns SMT solvers that are available via the C++ API.
+	static smt::SMTSolverChoice availableSolvers();
+
 private:
 	/// Bounded Model Checker engine.
 	BMC m_bmc;
+
+	/// Constrained Horn Clauses engine.
+	CHC m_chc;
 
 	/// Stores the context of the encoding.
 	smt::EncodingContext m_context;
 };
 
-}
 }

@@ -14,7 +14,7 @@ Using the Commandline Compiler
 
 One of the build targets of the Solidity repository is ``solc``, the solidity commandline compiler.
 Using ``solc --help`` provides you with an explanation of all options. The compiler can produce various outputs, ranging from simple binaries and assembly over an abstract syntax tree (parse tree) to estimations of gas usage.
-If you only want to compile a single file, you run it as ``solc --bin sourceFile.sol`` and it will print the binary. If you want to get some of the more advanced output variants of ``solc``, it is probably better to tell it to output everything to separate files using ``solc -o outputDirectory --bin --ast --asm sourceFile.sol``.
+If you only want to compile a single file, you run it as ``solc --bin sourceFile.sol`` and it will print the binary. If you want to get some of the more advanced output variants of ``solc``, it is probably better to tell it to output everything to separate files using ``solc -o outputDirectory --bin --ast-json --asm sourceFile.sol``.
 
 Before you deploy your contract, activate the optimizer when compiling using ``solc --optimize --bin sourceFile.sol``.
 By default, the optimizer will optimize the contract assuming it is called 200 times across its lifetime
@@ -57,7 +57,7 @@ Either add ``--libraries "file.sol:Math:0x12345678901234567890123456789012345678
 
 If ``solc`` is called with the option ``--link``, all input files are interpreted to be unlinked binaries (hex-encoded) in the ``__$53aea86b7d70b31448b230b20ae141a537$__``-format given above and are linked in-place (if the input is read from stdin, it is written to stdout). All options except ``--libraries`` are ignored (including ``-o``) in this case.
 
-If ``solc`` is called with the option ``--standard-json``, it will expect a JSON input (as explained below) on the standard input, and return a JSON output on the standard output. This is the recommended interface for more complex and especially automated uses.
+If ``solc`` is called with the option ``--standard-json``, it will expect a JSON input (as explained below) on the standard input, and return a JSON output on the standard output. This is the recommended interface for more complex and especially automated uses. The process will always terminate in a "success" state and report any errors via the JSON output.
 
 .. note::
     The library placeholder used to be the fully qualified name of the library itself
@@ -120,8 +120,11 @@ at each version. Backward compatibility is not guaranteed between each version.
 - ``constantinople``
    - Opcodes ``create2`, ``extcodehash``, ``shl``, ``shr`` and ``sar`` are available in assembly.
    - Shifting operators use shifting opcodes and thus need less gas.
-- ``petersburg`` (**default**)
+- ``petersburg``
    - The compiler behaves the same way as with constantinople.
+- ``istanbul`` (**default**)
+   - Opcodes ``chainid`` and ``selfbalance`` are available in assembly.
+- ``berlin`` (**experimental**)
 
 
 .. _compiler-api:
@@ -137,6 +140,8 @@ The fields are generally subject to change,
 some are optional (as noted), but we try to only make backwards compatible changes.
 
 The compiler API expects a JSON formatted input and outputs the compilation result in a JSON formatted output.
+The standard error output is not used and the process will always terminate in a "success" state, even
+if there were errors. Errors are always reported as part of the JSON output.
 
 The following subsections describe the format through an example.
 Comments are of course not permitted and used here only for explanatory purposes.
@@ -175,12 +180,12 @@ Input Description
             // `--allow-paths <path>`.
           ]
         },
-        "mortal":
+        "destructible":
         {
           // Optional: keccak256 hash of the source file
           "keccak256": "0x234...",
           // Required (unless "urls" is used): literal contents of the source file
-          "content": "contract mortal is owned { function kill() { if (msg.sender == owner) selfdestruct(owner); } }"
+          "content": "contract destructible is owned { function shutdown() { if (msg.sender == owner) selfdestruct(owner); } }"
         }
       },
       // Optional
@@ -193,15 +198,18 @@ Input Description
           // disabled by default
           "enabled": true,
           // Optimize for how many times you intend to run the code.
-          // Lower values will optimize more for initial deployment cost, higher values will optimize more for high-frequency usage.
+          // Lower values will optimize more for initial deployment cost, higher
+          // values will optimize more for high-frequency usage.
           "runs": 200,
           // Switch optimizer components on or off in detail.
           // The "enabled" switch above provides two defaults which can be
           // tweaked here. If "details" is given, "enabled" can be omitted.
           "details": {
-            // The peephole optimizer is always on if no details are given, use details to switch it off.
+            // The peephole optimizer is always on if no details are given,
+            // use details to switch it off.
             "peephole": true,
-            // The unused jumpdest remover is always on if no details are given, use details to switch it off.
+            // The unused jumpdest remover is always on if no details are given,
+            // use details to switch it off.
             "jumpdestRemover": true,
             // Sometimes re-orders literals in commutative operations.
             "orderLiterals": false,
@@ -212,9 +220,11 @@ Input Description
             "cse": false,
             // Optimize representation of literal numbers and strings in code.
             "constantOptimizer": false,
-            // The new Yul optimizer. Mostly operates on the code of ABIEncoderV2.
-            // It can only be activated through the details here.
-            // This feature is still considered experimental.
+            // The new Yul optimizer. Mostly operates on the code of ABIEncoderV2
+            // and inline assembly.
+            // It is activated together with the global optimizer setting
+            // and can be deactivated here.
+            // Before Solidity 0.6.0 it had to be activated through this switch.
             "yul": false,
             // Tuning options for the Yul optimizer.
             "yulDetails": {
@@ -224,16 +234,36 @@ Input Description
             }
           }
         },
-        "evmVersion": "byzantium", // Version of the EVM to compile for. Affects type checking and code generation. Can be homestead, tangerineWhistle, spuriousDragon, byzantium, constantinople or petersburg
+        // Version of the EVM to compile for.
+        // Affects type checking and code generation. Can be homestead,
+        // tangerineWhistle, spuriousDragon, byzantium, constantinople, petersburg, istanbul or berlin
+        "evmVersion": "byzantium",
+        // Optional: Debugging settings
+        "debug": {
+          // How to treat revert (and require) reason strings. Settings are
+          // "default", "strip", "debug" and "verboseDebug".
+          // "default" does not inject compiler-generated revert strings and keeps user-supplied ones.
+          // "strip" removes all revert strings (if possible, i.e. if literals are used) keeping side-effects
+          // "debug" injects strings for compiler-generated internal reverts (not yet implemented)
+          // "verboseDebug" even appends further information to user-supplied revert strings (not yet implemented)
+          "revertStrings": "default"
+        }
         // Metadata settings (optional)
         "metadata": {
           // Use only literal content and not URLs (false by default)
-          "useLiteralContent": true
+          "useLiteralContent": true,
+          // Use the given hash method for the metadata hash that is appended to the bytecode.
+          // The metadata hash can be removed from the bytecode via option "none".
+          // The other options are "ipfs" and "bzzr1".
+          // If the option is omitted, "ipfs" is used by default.
+          "bytecodeHash": "ipfs"
         },
-        // Addresses of the libraries. If not all libraries are given here, it can result in unlinked objects whose output data is different.
+        // Addresses of the libraries. If not all libraries are given here,
+        // it can result in unlinked objects whose output data is different.
         "libraries": {
           // The top level key is the the name of the source file where the library is used.
-          // If remappings are used, this source file should match the global path after remappings were applied.
+          // If remappings are used, this source file should match the global path
+          // after remappings were applied.
           // If this key is an empty string, that refers to a global level.
           "myFile.sol": {
             "MyLib": "0x123123..."
@@ -265,6 +295,7 @@ Input Description
         //   metadata - Metadata
         //   ir - Yul intermediate representation of the code before optimization
         //   irOptimized - Intermediate representation after optimization
+        //   storageLayout - Slots, offsets and types of the contract's state variables.
         //   evm.assembly - New assembly format
         //   evm.legacyAssembly - Old-style assembly format in JSON
         //   evm.bytecode.object - Bytecode object
@@ -336,7 +367,8 @@ Output Description
           "formattedMessage": "sourceFile.sol:100: Invalid keyword"
         }
       ],
-      // This contains the file-level outputs. In can be limited/filtered by the outputSelection settings.
+      // This contains the file-level outputs.
+      // It can be limited/filtered by the outputSelection settings.
       "sources": {
         "sourceFile.sol": {
           // Identifier of the source (used in source maps)
@@ -347,13 +379,14 @@ Output Description
           "legacyAST": {}
         }
       },
-      // This contains the contract-level outputs. It can be limited/filtered by the outputSelection settings.
+      // This contains the contract-level outputs.
+      // It can be limited/filtered by the outputSelection settings.
       "contracts": {
         "sourceFile.sol": {
           // If the language used has no contract names, this field should equal to an empty string.
           "ContractName": {
             // The Ethereum Contract ABI. If empty, it is represented as an empty array.
-            // See https://github.com/ethereum/wiki/wiki/Ethereum-Contract-ABI
+            // See https://solidity.readthedocs.io/en/develop/abi-spec.html
             "abi": [],
             // See the Metadata Output documentation (serialised JSON string)
             "metadata": "{...}",
@@ -363,6 +396,8 @@ Output Description
             "devdoc": {},
             // Intermediate representation (string)
             "ir": "",
+            // See the Storage Layout documentation.
+            "storageLayout": {"storage": [...], "types": {...} },
             // EVM-related outputs
             "evm": {
               // Assembly (string)
@@ -380,7 +415,8 @@ Output Description
                 // If given, this is an unlinked object.
                 "linkReferences": {
                   "libraryFile.sol": {
-                    // Byte offsets into the bytecode. Linking replaces the 20 bytes located there.
+                    // Byte offsets into the bytecode.
+                    // Linking replaces the 20 bytes located there.
                     "Library1": [
                       { "start": 0, "length": 20 },
                       { "start": 200, "length": 20 }

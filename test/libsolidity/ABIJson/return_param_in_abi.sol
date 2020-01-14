@@ -11,30 +11,29 @@ contract test {
 //     :test
 // [
 //   {
-//     "constant": false,
+//     "inputs":
+//     [
+//       {
+//         "internalType": "enum test.ActionChoices",
+//         "name": "param",
+//         "type": "uint8"
+//       }
+//     ],
+//     "stateMutability": "nonpayable",
+//     "type": "constructor"
+//   },
+//   {
 //     "inputs": [],
 //     "name": "ret",
 //     "outputs":
 //     [
 //       {
+//         "internalType": "enum test.ActionChoices",
 //         "name": "",
 //         "type": "uint8"
 //       }
 //     ],
-//     "payable": false,
 //     "stateMutability": "nonpayable",
 //     "type": "function"
-//   },
-//   {
-//     "inputs":
-//     [
-//       {
-//         "name": "param",
-//         "type": "uint8"
-//       }
-//     ],
-//     "payable": false,
-//     "stateMutability": "nonpayable",
-//     "type": "constructor"
 //   }
 // ]

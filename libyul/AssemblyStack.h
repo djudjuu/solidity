@@ -16,7 +16,7 @@
 */
 /**
  * Full assembly stack that can support EVM-assembly and Yul as input and EVM, EVM1.5 and
- * eWasm as output.
+ * Ewasm as output.
  */
 
 #pragma once
@@ -34,36 +34,36 @@
 #include <memory>
 #include <string>
 
-namespace langutil
+namespace solidity::langutil
 {
 class Scanner;
 }
 
-namespace yul
+namespace solidity::yul
 {
 class AbstractAssembly;
 
 
 struct MachineAssemblyObject
 {
-	std::shared_ptr<dev::eth::LinkerObject> bytecode;
+	std::shared_ptr<evmasm::LinkerObject> bytecode;
 	std::string assembly;
 };
 
 /*
  * Full assembly stack that can support EVM-assembly and Yul as input and EVM, EVM1.5 and
- * eWasm as output.
+ * Ewasm as output.
  */
 class AssemblyStack
 {
 public:
-	enum class Language { Yul, Assembly, StrictAssembly, EWasm };
-	enum class Machine { EVM, EVM15, eWasm };
+	enum class Language { Yul, Assembly, StrictAssembly, Ewasm };
+	enum class Machine { EVM, EVM15, Ewasm };
 
 	AssemblyStack():
-		AssemblyStack(langutil::EVMVersion{}, Language::Assembly, dev::solidity::OptimiserSettings::none())
+		AssemblyStack(langutil::EVMVersion{}, Language::Assembly, solidity::frontend::OptimiserSettings::none())
 	{}
-	AssemblyStack(langutil::EVMVersion _evmVersion, Language _language, dev::solidity::OptimiserSettings _optimiserSettings):
+	AssemblyStack(langutil::EVMVersion _evmVersion, Language _language, solidity::frontend::OptimiserSettings _optimiserSettings):
 		m_language(_language),
 		m_evmVersion(_evmVersion),
 		m_optimiserSettings(std::move(_optimiserSettings)),
@@ -80,6 +80,9 @@ public:
 	/// Run the optimizer suite. Can only be used with Yul or strict assembly.
 	/// If the settings (see constructor) disabled the optimizer, nothing is done here.
 	void optimize();
+
+	/// Translate the source to a different language / dialect.
+	void translate(Language _targetLanguage);
 
 	/// Run the assembly step (should only be called after parseAndAnalyze).
 	MachineAssemblyObject assemble(Machine _machine) const;
@@ -103,7 +106,7 @@ private:
 
 	Language m_language = Language::Assembly;
 	langutil::EVMVersion m_evmVersion;
-	dev::solidity::OptimiserSettings m_optimiserSettings;
+	solidity::frontend::OptimiserSettings m_optimiserSettings;
 
 	std::shared_ptr<langutil::Scanner> m_scanner;
 

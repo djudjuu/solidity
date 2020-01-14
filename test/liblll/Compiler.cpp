@@ -22,7 +22,7 @@
 
 #include <test/Options.h>
 
-#include <libdevcore/FixedHash.h>
+#include <libsolutil/FixedHash.h>
 
 #include <liblll/Compiler.h>
 
@@ -32,12 +32,9 @@
 #include <memory>
 
 using namespace std;
+using namespace solidity::util;
 
-namespace dev
-{
-namespace lll
-{
-namespace test
+namespace solidity::lll::test
 {
 
 namespace
@@ -46,7 +43,7 @@ namespace
 bool successCompile(string const& _sourceCode)
 {
 	vector<string> errors;
-	bytes bytecode = lll::compileLLL(_sourceCode, dev::test::Options::get().evmVersion(), false, &errors);
+	bytes bytecode = lll::compileLLL(_sourceCode, solidity::test::Options::get().evmVersion(), false, &errors);
 	if (!errors.empty())
 		return false;
 	if (bytecode.empty())
@@ -193,6 +190,8 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_functional)
 		"4300",
 		"4400",
 		"4500",
+		"4600",
+		"4700",
 		"60005000",
 		"60005100",
 		"600060005200",
@@ -299,6 +298,8 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_functional)
 		"(NUMBER)",
 		"(DIFFICULTY)",
 		"(GASLIMIT)",
+		"(CHAINID)",
+		"(SELFBALANCE)",
 		"(POP 0)",
 		"(MLOAD 0)",
 		"(MSTORE 0 0)",
@@ -361,7 +362,7 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_functional)
 	for (size_t i = 0; i < opcodes_bytecode.size(); i++)
 	{
 		vector<string> errors;
-		bytes code = lll::compileLLL(opcodes_lll[i], dev::test::Options::get().evmVersion(), false, &errors);
+		bytes code = lll::compileLLL(opcodes_lll[i], solidity::test::Options::get().evmVersion(), false, &errors);
 
 		BOOST_REQUIRE_MESSAGE(errors.empty(), opcodes_lll[i]);
 
@@ -418,6 +419,8 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_asm)
 		"4300",
 		"4400",
 		"4500",
+		"4600",
+		"4700",
 		"60005000",
 		"60005100",
 		"600060005200",
@@ -557,6 +560,8 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_asm)
 		"(asm NUMBER)",
 		"(asm DIFFICULTY)",
 		"(asm GASLIMIT)",
+		"(asm CHAINID)",
+		"(asm SELFBALANCE)",
 		"(asm 0 POP)",
 		"(asm 0 MLOAD)",
 		"(asm 0 0 MSTORE)",
@@ -652,7 +657,7 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_asm)
 	for (size_t i = 0; i < opcodes_bytecode.size(); i++)
 	{
 		vector<string> errors;
-		bytes code = lll::compileLLL(opcodes_lll[i], dev::test::Options::get().evmVersion(), false, &errors);
+		bytes code = lll::compileLLL(opcodes_lll[i], solidity::test::Options::get().evmVersion(), false, &errors);
 
 		BOOST_REQUIRE_MESSAGE(errors.empty(), opcodes_lll[i]);
 
@@ -662,6 +667,4 @@ BOOST_AUTO_TEST_CASE(valid_opcodes_asm)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-}
-}
 } // end namespaces

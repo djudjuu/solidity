@@ -17,6 +17,7 @@
 
 #include <test/libyul/YulOptimizerTest.h>
 
+#include <test/libsolidity/util/SoltestErrors.h>
 #include <test/Options.h>
 
 #include <libyul/optimiser/BlockFlattener.h>
@@ -25,6 +26,9 @@
 #include <libyul/optimiser/ControlFlowSimplifier.h>
 #include <libyul/optimiser/DeadCodeEliminator.h>
 #include <libyul/optimiser/Disambiguator.h>
+#include <libyul/optimiser/CallGraphGenerator.h>
+#include <libyul/optimiser/ConditionalUnsimplifier.h>
+#include <libyul/optimiser/ConditionalSimplifier.h>
 #include <libyul/optimiser/CommonSubexpressionEliminator.h>
 #include <libyul/optimiser/NameCollector.h>
 #include <libyul/optimiser/EquivalentFunctionCombiner.h>
@@ -34,16 +38,20 @@
 #include <libyul/optimiser/ExpressionInliner.h>
 #include <libyul/optimiser/FullInliner.h>
 #include <libyul/optimiser/ForLoopConditionIntoBody.h>
+#include <libyul/optimiser/ForLoopConditionOutOfBody.h>
 #include <libyul/optimiser/ForLoopInitRewriter.h>
 #include <libyul/optimiser/LoadResolver.h>
+#include <libyul/optimiser/LoopInvariantCodeMotion.h>
 #include <libyul/optimiser/MainFunction.h>
 #include <libyul/optimiser/NameDisplacer.h>
 #include <libyul/optimiser/Rematerialiser.h>
 #include <libyul/optimiser/ExpressionSimplifier.h>
 #include <libyul/optimiser/UnusedPruner.h>
 #include <libyul/optimiser/ExpressionJoiner.h>
+#include <libyul/optimiser/OptimiserStep.h>
 #include <libyul/optimiser/SSAReverser.h>
 #include <libyul/optimiser/SSATransform.h>
+#include <libyul/optimiser/Semantics.h>
 #include <libyul/optimiser/RedundantAssignEliminator.h>
 #include <libyul/optimiser/StructuralSimplifier.h>
 #include <libyul/optimiser/StackCompressor.h>
@@ -52,6 +60,7 @@
 #include <libyul/backends/evm/EVMDialect.h>
 #include <libyul/backends/evm/EVMMetrics.h>
 #include <libyul/backends/wasm/WordSizeTransform.h>
+#include <libyul/backends/wasm/WasmDialect.h>
 #include <libyul/AsmPrinter.h>
 #include <libyul/AsmParser.h>
 #include <libyul/AsmAnalysis.h>
@@ -61,19 +70,21 @@
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/Scanner.h>
 
-#include <libdevcore/AnsiColorized.h>
+#include <libsolutil/AnsiColorized.h>
 
 #include <boost/test/unit_test.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include <fstream>
+#include <variant>
 
-using namespace dev;
-using namespace langutil;
-using namespace yul;
-using namespace yul::test;
-using namespace dev::solidity;
-using namespace dev::solidity::test;
+using namespace solidity;
+using namespace solidity::util;
+using namespace solidity::langutil;
+using namespace solidity::yul;
+using namespace solidity::yul::test;
+using namespace solidity::frontend;
+using namespace solidity::frontend::test;
 using namespace std;
 
 YulOptimizerTest::YulOptimizerTest(string const& _filename)
@@ -89,12 +100,24 @@ YulOptimizerTest::YulOptimizerTest(string const& _filename)
 	file.exceptions(ios::badbit);
 
 	m_source = parseSourceAndSettings(file);
-	if (m_settings.count("yul"))
+	if (m_settings.count("dialect"))
 	{
-		m_yul = true;
-		m_validatedSettings["yul"] = "true";
-		m_settings.erase("yul");
+		auto dialectName = m_settings["dialect"];
+		if (dialectName == "yul")
+			m_dialect = &Dialect::yul();
+		else if (dialectName == "ewasm")
+			m_dialect = &WasmDialect::instance();
+		else if (dialectName == "evm")
+			m_dialect = &EVMDialect::strictAssemblyForEVMObjects(solidity::test::Options::get().evmVersion());
+		else
+			BOOST_THROW_EXCEPTION(runtime_error("Invalid dialect " + dialectName));
+
+		m_validatedSettings["dialect"] = dialectName;
+		m_settings.erase("dialect");
 	}
+	else
+		m_dialect = &EVMDialect::strictAssemblyForEVMObjects(solidity::test::Options::get().evmVersion());
+
 	if (m_settings.count("step"))
 	{
 		m_validatedSettings["step"] = m_settings["step"];
@@ -110,21 +133,23 @@ TestCase::TestResult YulOptimizerTest::run(ostream& _stream, string const& _line
 		return TestResult::FatalError;
 
 	soltestAssert(m_dialect, "Dialect not set.");
+
+	updateContext();
+
 	if (m_optimizerStep == "disambiguator")
 		disambiguate();
 	else if (m_optimizerStep == "nameDisplacer")
 	{
 		disambiguate();
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
 		NameDisplacer{
-			nameDispenser,
+			*m_nameDispenser,
 			{"illegal1"_yulstring, "illegal2"_yulstring, "illegal3"_yulstring, "illegal4"_yulstring, "illegal5"_yulstring}
 		}(*m_ast);
 	}
 	else if (m_optimizerStep == "blockFlattener")
 	{
 		disambiguate();
-		BlockFlattener{}(*m_ast);
+		BlockFlattener::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "constantOptimiser")
 	{
@@ -132,193 +157,206 @@ TestCase::TestResult YulOptimizerTest::run(ostream& _stream, string const& _line
 		ConstantOptimiser{dynamic_cast<EVMDialect const&>(*m_dialect), meter}(*m_ast);
 	}
 	else if (m_optimizerStep == "varDeclInitializer")
-		VarDeclInitializer{}(*m_ast);
+		VarDeclInitializer::run(*m_context, *m_ast);
 	else if (m_optimizerStep == "varNameCleaner")
-		VarNameCleaner{*m_ast, *m_dialect}(*m_ast);
+		VarNameCleaner::run(*m_context, *m_ast);
 	else if (m_optimizerStep == "forLoopConditionIntoBody")
 	{
 		disambiguate();
-		ForLoopConditionIntoBody{}(*m_ast);
+		ForLoopConditionIntoBody::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "forLoopInitRewriter")
 	{
 		disambiguate();
-		ForLoopInitRewriter{}(*m_ast);
+		ForLoopInitRewriter::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "commonSubexpressionEliminator")
 	{
 		disambiguate();
-		(CommonSubexpressionEliminator{*m_dialect})(*m_ast);
+		CommonSubexpressionEliminator::run(*m_context, *m_ast);
+	}
+	else if (m_optimizerStep == "conditionalUnsimplifier")
+	{
+		disambiguate();
+		ConditionalUnsimplifier::run(*m_context, *m_ast);
+	}
+	else if (m_optimizerStep == "conditionalSimplifier")
+	{
+		disambiguate();
+		ConditionalSimplifier::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "expressionSplitter")
-	{
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		ExpressionSplitter{*m_dialect, nameDispenser}(*m_ast);
-	}
+		ExpressionSplitter::run(*m_context, *m_ast);
 	else if (m_optimizerStep == "expressionJoiner")
 	{
 		disambiguate();
-		ExpressionJoiner::run(*m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "splitJoin")
 	{
 		disambiguate();
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		ExpressionSplitter{*m_dialect, nameDispenser}(*m_ast);
-		ExpressionJoiner::run(*m_ast);
-		ExpressionJoiner::run(*m_ast);
+		ExpressionSplitter::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "functionGrouper")
 	{
 		disambiguate();
-		(FunctionGrouper{})(*m_ast);
+		FunctionGrouper::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "functionHoister")
 	{
 		disambiguate();
-		(FunctionHoister{})(*m_ast);
+		FunctionHoister::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "expressionInliner")
 	{
 		disambiguate();
-		ExpressionInliner(*m_dialect, *m_ast).run();
+		ExpressionInliner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "fullInliner")
 	{
 		disambiguate();
-		(FunctionHoister{})(*m_ast);
-		(FunctionGrouper{})(*m_ast);
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		ExpressionSplitter{*m_dialect, nameDispenser}(*m_ast);
-		FullInliner(*m_ast, nameDispenser).run();
-		ExpressionJoiner::run(*m_ast);
+		FunctionHoister::run(*m_context, *m_ast);
+		FunctionGrouper::run(*m_context, *m_ast);
+		ExpressionSplitter::run(*m_context, *m_ast);
+		FullInliner::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "mainFunction")
 	{
 		disambiguate();
-		(FunctionGrouper{})(*m_ast);
-		(MainFunction{})(*m_ast);
+		FunctionGrouper::run(*m_context, *m_ast);
+		MainFunction::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "rematerialiser")
 	{
 		disambiguate();
-		Rematerialiser::run(*m_dialect, *m_ast);
+		Rematerialiser::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "expressionSimplifier")
 	{
 		disambiguate();
-		ExpressionSimplifier::run(*m_dialect, *m_ast);
-		ExpressionSimplifier::run(*m_dialect, *m_ast);
-		ExpressionSimplifier::run(*m_dialect, *m_ast);
+		ExpressionSimplifier::run(*m_context, *m_ast);
+		ExpressionSimplifier::run(*m_context, *m_ast);
+		ExpressionSimplifier::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "fullSimplify")
 	{
 		disambiguate();
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		ExpressionSplitter{*m_dialect, nameDispenser}(*m_ast);
-		ForLoopInitRewriter{}(*m_ast);
-		CommonSubexpressionEliminator{*m_dialect}(*m_ast);
-		ExpressionSimplifier::run(*m_dialect, *m_ast);
-		UnusedPruner::runUntilStabilised(*m_dialect, *m_ast);
-		DeadCodeEliminator{*m_dialect}(*m_ast);
-		ExpressionJoiner::run(*m_ast);
-		ExpressionJoiner::run(*m_ast);
+		ExpressionSplitter::run(*m_context, *m_ast);
+		ForLoopInitRewriter::run(*m_context, *m_ast);
+		CommonSubexpressionEliminator::run(*m_context, *m_ast);
+		ExpressionSimplifier::run(*m_context, *m_ast);
+		UnusedPruner::run(*m_context, *m_ast);
+		DeadCodeEliminator::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "unusedPruner")
 	{
 		disambiguate();
-		UnusedPruner::runUntilStabilised(*m_dialect, *m_ast);
+		UnusedPruner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "deadCodeEliminator")
 	{
 		disambiguate();
-		ForLoopInitRewriter{}(*m_ast);
-		DeadCodeEliminator{*m_dialect}(*m_ast);
+		ForLoopInitRewriter::run(*m_context, *m_ast);
+		DeadCodeEliminator::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "ssaTransform")
 	{
 		disambiguate();
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		SSATransform::run(*m_ast, nameDispenser);
+		SSATransform::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "redundantAssignEliminator")
 	{
 		disambiguate();
-		RedundantAssignEliminator::run(*m_dialect, *m_ast);
+		RedundantAssignEliminator::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "ssaPlusCleanup")
 	{
 		disambiguate();
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		SSATransform::run(*m_ast, nameDispenser);
-		RedundantAssignEliminator::run(*m_dialect, *m_ast);
+		SSATransform::run(*m_context, *m_ast);
+		RedundantAssignEliminator::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "loadResolver")
 	{
 		disambiguate();
-		ForLoopInitRewriter{}(*m_ast);
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		ExpressionSplitter{*m_dialect, nameDispenser}(*m_ast);
-		CommonSubexpressionEliminator{*m_dialect}(*m_ast);
-		ExpressionSimplifier::run(*m_dialect, *m_ast);
+		ForLoopInitRewriter::run(*m_context, *m_ast);
+		ExpressionSplitter::run(*m_context, *m_ast);
+		CommonSubexpressionEliminator::run(*m_context, *m_ast);
+		ExpressionSimplifier::run(*m_context, *m_ast);
 
-		LoadResolver::run(*m_dialect, *m_ast);
+		LoadResolver::run(*m_context, *m_ast);
 
-		UnusedPruner::runUntilStabilised(*m_dialect, *m_ast);
-		ExpressionJoiner::run(*m_ast);
-		ExpressionJoiner::run(*m_ast);
+		UnusedPruner::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
+		ExpressionJoiner::run(*m_context, *m_ast);
+	}
+	else if (m_optimizerStep == "loopInvariantCodeMotion")
+	{
+		disambiguate();
+		ForLoopInitRewriter::run(*m_context, *m_ast);
+		LoopInvariantCodeMotion::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "controlFlowSimplifier")
 	{
 		disambiguate();
-		ControlFlowSimplifier{*m_dialect}(*m_ast);
+		ControlFlowSimplifier::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "structuralSimplifier")
 	{
 		disambiguate();
-		StructuralSimplifier{*m_dialect}(*m_ast);
+		ForLoopInitRewriter::run(*m_context, *m_ast);
+		LiteralRematerialiser::run(*m_context, *m_ast);
+		StructuralSimplifier::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "equivalentFunctionCombiner")
 	{
 		disambiguate();
-		EquivalentFunctionCombiner::run(*m_ast);
+		EquivalentFunctionCombiner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "ssaReverser")
 	{
 		disambiguate();
-		SSAReverser::run(*m_ast);
+		SSAReverser::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "ssaAndBack")
 	{
 		disambiguate();
 		// apply SSA
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		SSATransform::run(*m_ast, nameDispenser);
-		RedundantAssignEliminator::run(*m_dialect, *m_ast);
+		SSATransform::run(*m_context, *m_ast);
+		RedundantAssignEliminator::run(*m_context, *m_ast);
 		// reverse SSA
-		SSAReverser::run(*m_ast);
-		CommonSubexpressionEliminator{*m_dialect}(*m_ast);
-		UnusedPruner::runUntilStabilised(*m_dialect, *m_ast);
+		SSAReverser::run(*m_context, *m_ast);
+		CommonSubexpressionEliminator::run(*m_context, *m_ast);
+		UnusedPruner::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "stackCompressor")
 	{
 		disambiguate();
-		(FunctionGrouper{})(*m_ast);
+		FunctionGrouper::run(*m_context, *m_ast);
 		size_t maxIterations = 16;
-		StackCompressor::run(*m_dialect, *m_ast, true, maxIterations);
-		(BlockFlattener{})(*m_ast);
+		Object obj;
+		obj.code = m_ast;
+		StackCompressor::run(*m_dialect, obj, true, maxIterations);
+		m_ast = obj.code;
+		BlockFlattener::run(*m_context, *m_ast);
 	}
 	else if (m_optimizerStep == "wordSizeTransform")
 	{
 		disambiguate();
-		NameDispenser nameDispenser{*m_dialect, *m_ast};
-		ExpressionSplitter{*m_dialect, nameDispenser}(*m_ast);
-		WordSizeTransform::run(*m_dialect, *m_ast, nameDispenser);
+		ExpressionSplitter::run(*m_context, *m_ast);
+		WordSizeTransform::run(*m_dialect, *m_ast, *m_nameDispenser);
 	}
 	else if (m_optimizerStep == "fullSuite")
 	{
 		GasMeter meter(dynamic_cast<EVMDialect const&>(*m_dialect), false, 200);
-		OptimiserSuite::run(*m_dialect, &meter, *m_ast, *m_analysisInfo, true);
+		yul::Object obj;
+		obj.code = m_ast;
+		obj.analysisInfo = m_analysisInfo;
+		OptimiserSuite::run(*m_dialect, &meter, obj, true);
 	}
 	else
 	{
@@ -326,7 +364,7 @@ TestCase::TestResult YulOptimizerTest::run(ostream& _stream, string const& _line
 		return TestResult::FatalError;
 	}
 
-	m_obtainedResult = AsmPrinter{m_yul}(*m_ast) + "\n";
+	m_obtainedResult = AsmPrinter{m_dialect->flavour == AsmFlavour::Yul}(*m_ast) + "\n";
 
 	if (m_optimizerStep != m_validatedSettings["step"])
 	{
@@ -381,9 +419,9 @@ void YulOptimizerTest::printIndented(ostream& _stream, string const& _output, st
 bool YulOptimizerTest::parse(ostream& _stream, string const& _linePrefix, bool const _formatted)
 {
 	AssemblyStack stack(
-		dev::test::Options::get().evmVersion(),
-		m_yul ? AssemblyStack::Language::Yul : AssemblyStack::Language::StrictAssembly,
-		dev::solidity::OptimiserSettings::none()
+		solidity::test::Options::get().evmVersion(),
+		m_dialect->flavour == AsmFlavour::Yul ? AssemblyStack::Language::Yul : AssemblyStack::Language::StrictAssembly,
+		solidity::frontend::OptimiserSettings::none()
 	);
 	if (!stack.parseAndAnalyze("", m_source) || !stack.errors().empty())
 	{
@@ -391,7 +429,6 @@ bool YulOptimizerTest::parse(ostream& _stream, string const& _linePrefix, bool c
 		printErrors(_stream, stack.errors());
 		return false;
 	}
-	m_dialect = m_yul ? &Dialect::yul() : &EVMDialect::strictAssemblyForEVMObjects(dev::test::Options::get().evmVersion());
 	m_ast = stack.parserResult()->code;
 	m_analysisInfo = stack.parserResult()->analysisInfo;
 	return true;
@@ -399,8 +436,19 @@ bool YulOptimizerTest::parse(ostream& _stream, string const& _linePrefix, bool c
 
 void YulOptimizerTest::disambiguate()
 {
-	*m_ast = boost::get<Block>(Disambiguator(*m_dialect, *m_analysisInfo)(*m_ast));
+	*m_ast = std::get<Block>(Disambiguator(*m_dialect, *m_analysisInfo)(*m_ast));
 	m_analysisInfo.reset();
+	updateContext();
+}
+
+void YulOptimizerTest::updateContext()
+{
+	m_nameDispenser = make_unique<NameDispenser>(*m_dialect, *m_ast, m_reservedIdentifiers);
+	m_context = make_unique<OptimiserStepContext>(OptimiserStepContext{
+		*m_dialect,
+		*m_nameDispenser,
+		m_reservedIdentifiers
+	});
 }
 
 void YulOptimizerTest::printErrors(ostream& _stream, ErrorList const& _errors)

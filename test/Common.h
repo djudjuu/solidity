@@ -17,28 +17,36 @@
 
 #pragma once
 
-#include <libdevcore/Exceptions.h>
+#include <libsolutil/Exceptions.h>
 #include <liblangutil/EVMVersion.h>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/program_options.hpp>
 #include <boost/noncopyable.hpp>
 
-namespace dev
+namespace solidity::test
 {
 
-namespace test
-{
+#ifdef _WIN32
+static constexpr auto evmoneFilename = "evmone.dll";
+static constexpr auto evmoneDownloadLink = "https://github.com/ethereum/evmone/releases/download/v0.3.0/evmone-0.3.0-windows-amd64.zip";
+#elif defined(__APPLE__)
+static constexpr auto evmoneFilename = "libevmone.dylib";
+static constexpr auto evmoneDownloadLink = "https://github.com/ethereum/evmone/releases/download/v0.3.0/evmone-0.3.0-darwin-x86_64.tar.gz";
+#else
+static constexpr auto evmoneFilename = "libevmone.so";
+static constexpr auto evmoneDownloadLink = "https://github.com/ethereum/evmone/releases/download/v0.3.0/evmone-0.3.0-linux-x86_64.tar.gz";
+#endif
 
-struct ConfigException : public Exception {};
+
+struct ConfigException : public util::Exception {};
 
 struct CommonOptions: boost::noncopyable
 {
-	boost::filesystem::path ipcPath;
+	boost::filesystem::path evmonePath;
 	boost::filesystem::path testPath;
 	bool optimize = false;
 	bool optimizeYul = false;
-	bool disableIPC = false;
 	bool disableSMT = false;
 
 	langutil::EVMVersion evmVersion() const;
@@ -56,5 +64,4 @@ private:
 	std::string evmVersionString;
 };
 
-}
 }
